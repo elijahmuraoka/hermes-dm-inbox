@@ -1,0 +1,17 @@
+{
+  "name": "hermes-dm-inbox",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Local-first, keyboard-first unified DM inbox for Hermes Agent.",
+  "packageManager": "bun@1.3.11",
+  "scripts": {
+    "dev": "echo 'Spec-first repo: implementation scripts land after spec approval'",
+    "test": "echo 'No tests yet: spec-first repo'",
+    "docs:audit": "tomoji docs audit",
+    "docs:index": "tomoji docs index --verify"
+  },
+  "engines": {
+    "bun": ">=1.3.0",
+    "node": ">=22"
+  }
+}
