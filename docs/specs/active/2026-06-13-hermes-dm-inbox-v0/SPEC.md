@@ -16,7 +16,7 @@ pr:
 
 Build a local-first, keyboard-first unified DM inbox for Hermes Agent.
 
-The inbox consolidates private-message surfaces such as iMessage, LinkedIn, X/Twitter, Gmail, and future CLI-backed channels into one fast interface. the configured Hermes agent is the drafting, triage, and organization layer.
+The inbox consolidates private-message surfaces such as iMessage, LinkedIn, X/Twitter, and future CLI-backed DM channels into one fast interface. The configured Hermes agent is the drafting, triage, and organization layer. Gmail/email is deferred until the DM model is proven because email is not cleanly DM-shaped.
 
 ## Current decision reset
 
@@ -70,21 +70,28 @@ Rationale lives in `decisions/0001-tech-stack.md`.
 
 ## Architecture
 
+Canonical architecture decisions live in:
+
+- `context/final-system-architecture-and-plan.md`
+- `context/security-privacy-invariants.md`
+- `context/product-ux-contract.md`
+- `context/system-design-v0.md`
+
+The core architecture is:
+
 ```text
-Browser (React/Vite)
-  ↓ REST
-FastAPI local server
-  ├─ SQLite store
-  ├─ connector adapters
-  │   ├─ mock
-  │   ├─ imsg
-  │   ├─ linkedin-os
-  │   ├─ xurl
-  │   └─ gog
-  └─ Hermes adapter
-      ├─ mock
-      └─ local Hermes CLI / IPC
+Messaging sources
+  ↓
+Connector adapters + sync engine
+  ↓
+SQLite local inbox store
+  ↓
+Application services / primitives
+  ↓
+Surfaces: local REST UI, hdi CLI, /hermes-dm-inbox skill, future MCP
 ```
+
+Primitives are the canonical API. REST routes, CLI commands, and the Hermes skill are wrappers over the same primitives.
 
 ## Data model
 
@@ -92,14 +99,22 @@ Minimum SQLite tables:
 
 | Table | Purpose |
 |---|---|
+| sources | registered connector/source metadata |
+| source_accounts | local accounts/personas per source |
 | conversations | source/source_id, latest time, unread, muted, local status |
-| participants | source participant id, display name, handle |
-| messages | message metadata + redacted preview |
-| message_bodies | raw message body, separated from list/audit surfaces |
+| participants | source participant id, display name/alias, redacted handle |
+| conversation_participants | conversation-to-participant join table |
+| messages | message metadata + redacted preview only |
+| message_bodies | raw message body vault, separated from list/search/audit surfaces |
 | drafts | Hermes-produced drafts and edited draft text |
-| approvals | approval/rejection records |
+| draft_versions | draft revision history |
+| approvals | approval/rejection/send-intent records |
+| labels | local labels/categories |
+| conversation_labels | labeling join table |
+| tasks | follow-up/reminder work items derived from messages |
 | audit_logs | redacted operational event log |
 | sync_runs | connector sync history |
+| connector_state | connector cursors, health, and last successful sync |
 
 ## Connector contract
 
@@ -110,8 +125,20 @@ class ConnectorBase(ABC):
     source: str
     name: str
 
-    async def fetch_conversations(self) -> list[ConversationData]: ...
-    async def fetch_messages(self, conversation_id: str, since: str | None = None) -> list[MessageData]: ...
+    async def fetch_conversations(
+        self,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> Page[ConversationData]: ...
+
+    async def fetch_messages(
+        self,
+        conversation_id: str,
+        cursor: str | None = None,
+        since: str | None = None,
+        limit: int = 100,
+    ) -> Page[MessageData]: ...
+
     def capabilities(self) -> ConnectorCapabilities: ...
 ```
 
@@ -157,31 +184,45 @@ Acceptance:
 - SQLite store with body-vault schema
 - MockConnector with deterministic data
 - MockHermesAdapter
+- `hdi` CLI skeleton over the same primitives
 - Keyboard shell renders and passes smoke tests
+- Explicit body reveal is modeled as an audited `POST` action
 - No real connector data
 - No local Hermes invocation
+- No send path
 - `bun test`, `bun run build`, and server pytest pass
 
 ### Phase 1 — First real read-only data
 
 Acceptance:
 
-- iMessage read-only connector via `imsg`
-- LinkedIn read-only connector via `linkedin-os`
+- Exactly one real connector lands first, chosen from:
+  - iMessage read-only connector via `imsg`, or
+  - LinkedIn read-only connector via `linkedin-os`
 - Manual sync button
 - List views redacted
 - Body reveal is explicit
 - Audit log tests prove no raw body leakage
+
+### Phase 1.5 — Second real connector
+
+Acceptance:
+
+- The second connector lands only after the first connector proves idempotent sync and privacy boundaries
+- Connector abstraction supports two real sources without source-specific UI logic
 
 ### Phase 2 — Agent + more connectors
 
 Acceptance:
 
 - X/Twitter connector via `xurl`
-- Gmail connector via `gog`
 - LocalHermesAdapter opt-in harness
+- `/hermes-dm-inbox` skill packaged as resolver/wrapper over `hdi`/API primitives
 - Command palette can ask Hermes
 - Draft panel supports prompt/edit/regenerate/approve-intent
+- Follow-up task primitive exists
+
+Gmail via `gog` remains deferred until a separate email-shaped model is designed.
 
 ### Phase 3 — Production polish
 
@@ -217,9 +258,8 @@ Acceptance:
 
 ## Open questions for review
 
-1. Should the public product name be **Hermes DM Inbox** or **Hermes Inbox**?
-2. Should Phase 1 prioritize iMessage first, or LinkedIn first?
-3. Should Gmail be deferred until after the DM schema is proven, or should v0 intentionally become a broader unified communications inbox?
-4. Should the initial public repo push include only spec/docs first, or include Phase 0 mock implementation too?
-5. Does the default Hermes drafting flow need full body access by default, or should redacted-only be the strict default?
-6. What public positioning should the README use: “companion app for Hermes Agent” vs “local AI inbox powered by Hermes”?
+1. Public name: **Hermes DM Inbox** remains the default. Should it ever become **Hermes Inbox**?
+2. First real connector: should Phase 1 prioritize iMessage for local/macOS proof or LinkedIn for product value?
+3. Initial public push: docs/spec only first, or wait until Phase 0 mock implementation is ready?
+4. Body vault encryption: model boundary in Phase 0 only, or implement OS-keychain-backed encryption immediately?
+5. Public positioning: “local AI DM inbox powered by Hermes” vs “companion app for Hermes Agent”?
