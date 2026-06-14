@@ -2,13 +2,32 @@
 
 Local-first, keyboard-first unified DM inbox for Hermes Agent.
 
-This repository is intentionally kept clean on `main`. Specs, features, and implementation work happen in git worktrees and land back through reviewed branches.
+This repository uses a spec-first, worktree-first workflow:
+
+- Main checkout: `<repo-root>`
+- All active work: `wt` worktrees under `<worktrees-root>/hermes-dm-inbox/`
+- Package manager/runtime: Bun
+- Docs lifecycle: Tomoji `doc-maintenance`
+
+## Active spec
+
+Current review worktree:
+
+```text
+<worktree-root>
+```
+
+Spec bundle:
+
+```text
+docs/specs/active/2026-06-13-hermes-dm-inbox-v0/SPEC.md
+```
 
 ## Workflow
 
-- Main checkout: `/Users/bob/repos/hermes-dm-inbox`
-- All work: separate `wt` worktrees
-- Package manager: Bun
-- Documentation lifecycle: Tomoji `doc-maintenance` (`tomoji docs ...`)
+```bash
+cd <repo-root>
+wt new "hermes dm inbox phase 0 scaffold"
+```
 
-The first review branch contains the product/architecture spec.
+Do not implement directly in the main checkout.
