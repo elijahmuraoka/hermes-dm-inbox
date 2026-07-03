@@ -4,7 +4,7 @@
 
 Hermes DM Inbox should feel like:
 
-> **A local, keyboard-first DM cockpit where Hermes pre-sorts conversations, drafts replies, and makes every private-data reveal or external action explicit and reversible.**
+> **A local, keyboard-first DM cockpit where Hermes pre-sorts conversations, drafts replies, and makes every share-to-agent or external action explicit and reversible.**
 
 It is not just a chronological feed. It is a triage and drafting cockpit.
 
@@ -13,7 +13,7 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 1. **Triage first.** Default home answers “what needs my attention?” not “what arrived newest?”
 2. **Keyboard is product, not polish.** Hotkeys and command palette ship in Phase 0.
 3. **Hermes is visible but not intrusive.** The agent suggests, drafts, classifies, and explains; the human remains in control.
-4. **Privacy state is always visible.** Redacted, revealed-to-me, and shared-with-Hermes must feel different.
+4. **Sharing state is always visible.** Bodies are always readable by you; *not-shared* (default, quiet) vs *shared-with-Hermes* must feel different.
 5. **Drafts are review objects.** Drafts need versions, status, evidence, and approval state.
 6. **Source differences are metadata, not separate apps.** iMessage/LinkedIn/X should feel unified while preserving source capabilities.
 7. **Speed over configurability in v0.** Avoid complex rules/settings until the loop is excellent.
@@ -30,7 +30,7 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 | Command palette | execute all actions without leaving keyboard |
 | Draft queue | review pending generated drafts |
 | Search | find people/messages/tasks across sources |
-| Audit/reveal log | inspect privacy-sensitive events |
+| Audit/share log | inspect share-to-agent and other privacy-sensitive events |
 | Settings/connectors | source health, sync, connector setup guidance |
 
 ### Core buckets
@@ -41,9 +41,7 @@ Default buckets:
 - Drafted
 - Waiting
 - FYI
-- Noise
 - Done
-- Snoozed / Later
 
 These are local states derived from message metadata, user corrections, and Hermes suggestions. They are not the same as source-native folders.
 
@@ -75,7 +73,7 @@ Global:
 | `/` | search |
 | `g i` | inbox |
 | `g d` | drafts |
-| `g a` | audit/reveal log |
+| `g a` | audit/share log |
 | `r` | sync/refresh |
 
 Conversation navigation:
@@ -102,13 +100,12 @@ Hermes/draft:
 | `r` | regenerate draft when draft focused |
 | `x` | reject draft |
 
-Privacy:
+Sharing (see the Privacy/sharing UX section — bodies are always visible to the human):
 
 | Key | Action |
 |---|---|
-| `v` | reveal selected body to human |
-| `Shift+V` | reveal/share selected bodies to Hermes for current task |
-| `Esc` | close reveal/draft modal |
+| `Shift+V` | share selected body with Hermes for the current task |
+| `Esc` | close modal |
 
 ## Command palette taxonomy
 
@@ -119,7 +116,7 @@ Command categories:
 - Search: global search, source search, person search
 - Triage: classify unread, mark done, waiting, FYI, noise
 - Draft: draft reply, regenerate, change tone, shorten, approve intent
-- Privacy: reveal to me, share with Hermes, view reveal log
+- Privacy: share with Hermes, unshare, view audit log
 - Tasks: create follow-up, show tasks, mark complete
 - Labels: add/remove label, saved filters
 
@@ -153,7 +150,7 @@ Hermes should compute:
 Hermes should not:
 
 - auto-send
-- auto-reveal raw bodies
+- auto-share raw bodies
 - auto-delete/archive source messages in v0
 
 ## Draft workflow
@@ -172,7 +169,7 @@ not_started
 Draft panel requirements:
 
 - shows instructions used
-- shows body policy used: metadata/redacted/full-body
+- shows body policy used: metadata/full-body
 - shows model/locality: mock/local/cloud if applicable
 - supports regenerate with reason
 - supports tone/length controls
@@ -189,25 +186,33 @@ Draft controls:
 - preserve my voice
 - regenerate from selected messages
 
-## Privacy/reveal UX
+## Privacy/sharing UX
 
-The UI must distinguish three states:
+> **DECISION — Elijah, 2026-07-03 (supersedes the earlier redacted/revealed/shared tri-state).**
+> Hermes DM Inbox is a **single-user, local** app. Redacting a message body *from the human who owns it* is
+> friction with no benefit, so it is removed entirely: **message bodies are always fully visible to the
+> user** — no blur, no "reveal to me" step, no `v` shortcut, no human-view audit event.
+>
+> The only privacy boundary that carries weight is **what enters the agent's context**. The model therefore
+> collapses to a **binary** per message:
 
 | State | Meaning | Visual treatment |
 |---|---|---|
-| Redacted | raw body hidden | muted/lock indicator |
-| Revealed to me | human viewed body | local reveal badge |
-| Shared with Hermes | body included in model context | stronger agent-share badge + audit link |
+| Not shared (default) | body is visible to you but **not** in Hermes' context | **no chrome at all** |
+| Shared with Hermes | body is in Hermes' context for the current task | one subtle amber "share" badge (+ audit) |
 
-Key UX rule:
+Rules:
 
-> Viewing a message body yourself does not share it with Hermes.
+- Hermes drafts from **metadata only by default**; it sees full bodies only after an explicit share.
+- Sharing is an explicit, **reversible** act (`Shift+V` / "Share with Hermes"; "Unshare from Hermes" undoes it).
+- A shared body raises the draft panel's body-policy line from `metadata_only` to `explicit_full_body`.
+- The agent still cannot grant itself body access; sharing is always a human action, and it is audited.
 
-Reveal copy should be explicit:
+Sharing copy should be explicit:
 
-- “Reveal to me”
-- “Share selected messages with Hermes for this draft”
-- “Hermes will receive 3 message bodies for this one drafting task.”
+- “Share with Hermes”
+- “Hermes will receive this message body for this drafting task.”
+- “Unshare from Hermes”
 
 ## Search UX
 
@@ -244,7 +249,7 @@ Must define now:
 - hotkeys
 - command palette categories
 - bucket model
-- reveal/share language
+- share-to-Hermes language
 - draft lifecycle
 - loading/empty/error states
 - performance expectations
@@ -264,9 +269,9 @@ A public user can run the app with mock data and:
 
 1. see a fast inbox list
 2. navigate with keyboard
-3. open a thread
-4. see redacted/default privacy state
-5. explicitly reveal a mock body
+3. open a thread and read every message body
+4. see the default (not-shared) state carry no privacy chrome
+5. explicitly share a mock body with Hermes (and unshare it)
 6. ask mock Hermes to draft
 7. approve draft intent
 8. inspect audit events
@@ -290,7 +295,7 @@ Do not over-design:
 1. If the UI is chronological-feed-first, it will feel like a worse Messages app.
 2. If Hermes is hidden, the product loses its unique value.
 3. If Hermes is too autonomous, privacy trust breaks.
-4. If reveal states are subtle, users will not understand what the agent saw.
+4. If the shared-with-Hermes state is subtle, users will not understand what the agent saw.
 5. If draft approvals are not durable records, future send path will be unsafe.
 6. If connector quirks dominate the UI, it stops feeling unified.
 
