@@ -33,15 +33,15 @@ const P = (id: string, name: string, handle: string): Person => ({
 
 export const PEOPLE: Record<string, Person> = {
   me: P("me", "You", "@you"),
-  p1: P("p1", "Dana Okonkwo", "@dana.mock"),
-  p2: P("p2", "Priya Raman", "in/priya-mock"),
-  p3: P("p3", "Marco Feld", "@marco_mock"),
-  p4: P("p4", "Wei Chen", "in/wei-mock"),
-  p5: P("p5", "Sam Ellison", "@sam.mock"),
-  p6: P("p6", "Nadia Farouk", "@nadia_mock"),
-  p7: P("p7", "Tom Byrne", "in/tom-mock"),
-  p8: P("p8", "Aiko Sato", "@aiko.mock"),
-  p9: P("p9", "Luis Ortega", "@luis_mock"),
+  p1: P("p1", "Dana Okonkwo", "@danaokonkwo"),
+  p2: P("p2", "Priya Raman", "in/priya-raman"),
+  p3: P("p3", "Marco Feld", "@marcofeld"),
+  p4: P("p4", "Wei Chen", "in/wei-chen"),
+  p5: P("p5", "Sam Ellison", "@sam.ellison"),
+  p6: P("p6", "Nadia Farouk", "@nadiafarouk"),
+  p7: P("p7", "Tom Byrne", "in/tom-byrne"),
+  p8: P("p8", "Aiko Sato", "@aiko.sato"),
+  p9: P("p9", "Luis Ortega", "@luisortega"),
 };
 
 const iso = (minAgo: number) => new Date(MOCK_NOW - minAgo * 60000).toISOString();
@@ -557,7 +557,9 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
   const pid = `pg${i}`;
   const source = GEN_SOURCES[i % 3];
   const handle =
-    source === "linkedin" ? `in/${first.toLowerCase()}-mock` : `@${first.toLowerCase()}.mock`;
+    source === "linkedin"
+      ? `in/${first.toLowerCase()}-${last.toLowerCase()}`
+      : `@${first.toLowerCase()}${last.toLowerCase()}`;
   GENERATED_PEOPLE[pid] = P(pid, name, handle);
 
   const bucket = GEN_BUCKETS[i % GEN_BUCKETS.length];

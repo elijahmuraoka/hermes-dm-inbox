@@ -35,7 +35,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
       ["1 2 3", "Pick a draft angle (warm / direct / brief)"],
       ["e", "Add picked draft to chat"],
       ["c", "Focus composer"],
-      ["⌘⏎", "Send (mock — local only)"],
+      ["⌘⏎", "Send message"],
       ["r", "Regenerate (draft focused)"],
       ["Esc", "Leave composer / close modal"],
     ],

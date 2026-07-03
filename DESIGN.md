@@ -167,10 +167,9 @@ Each ships with **all states** — default · hover · focus-visible · selected
    **cancels any in-flight generation**. Tone controls + regenerate-with-reason operate on the card. Side
    rail at `xl+`, bottom sheet below.
 4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
-   button (**mock affordance — records intent only**), Send. `c` or `Enter`-in-thread focuses it; `⌘Enter`
-   sends; `Esc` returns to list scope. **v0 send = LOCAL MOCK**: appends the outgoing message with a
-   subtle "✓ mock — not delivered" label, moves the thread to Waiting on them, and the honesty footer
-   ("v0 sends are local mock — no real delivery") is always visible.
+   button, Send. `c` or `Enter`-in-thread focuses it; `⌘Enter` sends; `Esc` returns to list scope.
+   Sending appends the outgoing message and moves the thread to Waiting on them — **presented exactly as
+   a real send** (diegetic rule, §7). That v0 delivery is a local mock is code/commit/PR knowledge only.
 5. **CommandPalette (⌘K)** — categorized (Navigate/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.
 6. **ThreadShareState** — the thread-level signal from §3 (chip + toggle in the Thread strip); the row tick
@@ -196,7 +195,12 @@ Each ships with **all states** — default · hover · focus-visible · selected
 
 - Anti-slop canon applies: **no AI-purple/indigo gradients, no glass-morphism everywhere, no eyebrow-chip
   hero clichés, no banned fonts, ≤ tasteful em-dash use.** One signature accent, earned depth.
-- **Honesty:** mock/illustrative data is labeled; no fake precision, no lorem that implies real content.
+- **Diegetic prototype (Elijah, 2026-07-03 — supersedes the "label mock data" rule):** the interface always
+  presents the product working LEGITIMATELY — a send looks and behaves like a real send, period.
+  **Meta-commentary rendered in the UI (v0/mock/demo/"not delivered" language) is a DEFECT.** Implementation
+  honesty (e.g. v0 sends are local-only, nothing is delivered) lives in code comments, commit messages, and
+  PR descriptions — never on the surface. Dev tooling is exempt (DEV-gated palette commands, `?state=`
+  params). Fixture data stays synthetic (fictional people) but reads plausible, not watermarked.
 - **Accessibility:** WCAG AA contrast in **both** themes (verify the dark cyan on near-black + light blue on
   white), full keyboard operability, visible focus, reduced-motion, ARIA on the palette/modals.
 - **Privacy legibility beats aesthetics** wherever they conflict.
@@ -214,8 +218,8 @@ A slice is done only when, on a **real running app with mock data**, rendered an
    tick), instantly legible without reading labels; the **Block/Allow** opt-out works and is audited.
 4. `⌘K` palette opens <100ms, categorized, keyboard-only usable; `?` shows shortcuts.
 5. `d` returns **three angles**; `1/2/3` picks one; `e` adds it to the composer; edit there; `⌘Enter`
-   mock-sends with the honest label; lifecycle + live body-policy pill (**Full thread** default,
-   **Metadata only** when blocked) + "Drafted from:" provenance visible throughout.
+   sends (the message appears in-thread as a real send — no meta labels); lifecycle + live body-policy
+   pill (**Full thread** default, **Metadata only** when blocked) + "Drafted from:" provenance visible.
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.

@@ -23,7 +23,7 @@ const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
   generated: "Generated",
   added_to_chat: "In composer",
   edited: "Edited in composer",
-  sent_mock: "Sent (mock)",
+  sent_mock: "Sent",
 };
 
 const POLICY_LABEL: Record<BodyPolicy, string> = {
@@ -209,7 +209,8 @@ export function HermesDraftPanel({
                 </p>
               )}
               <p>
-                <span className="text-muted-foreground">Model:</span> {draft.modelLocality} ·{" "}
+                <span className="text-muted-foreground">Model:</span>{" "}
+                {draft.modelLocality === "mock" ? "local" : draft.modelLocality} ·{" "}
                 <span className="text-muted-foreground">version</span>{" "}
                 {draft.versions.findIndex((v) => v.id === active.id) + 1}/{draft.versions.length}
               </p>
@@ -288,7 +289,7 @@ export function HermesDraftPanel({
                   disabled={drafting}
                 >
                   {sent ? <Check /> : <SendHorizontal />}{" "}
-                  {sent ? "Sent (mock)" : "Add to chat"}{" "}
+                  {sent ? "Sent" : "Add to chat"}{" "}
                   <Kbd
                     className={cn(
                       "ml-0.5",
@@ -301,8 +302,7 @@ export function HermesDraftPanel({
                 </Button>
               </div>
               <p className="text-[0.65625rem] leading-snug text-muted-foreground">
-                This card is read-only — edit in the composer. v0 sends are local mock: no real
-                delivery. Hermes drafts; you send.
+                This card is read-only — edit in the composer. Hermes drafts; you send.
               </p>
             </div>
           </div>

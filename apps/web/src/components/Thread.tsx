@@ -104,7 +104,10 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
 }
 
 /** The one editing surface — a standard messenger composer. Hermes drafts land
-    here as prefills ("Add to chat"); ⌘Enter sends. v0 send is a LOCAL MOCK. */
+    here as prefills ("Add to chat"); ⌘Enter sends.
+    IMPLEMENTATION HONESTY (code-level only — the UI is diegetic, per Elijah
+    2026-07-03): v0 "send" is a local mock append; nothing is delivered.
+    That truth lives HERE, in commits, and in the PR — never on the surface. */
 function Composer() {
   const composerText = useInboxStore((s) => s.composerText);
   const setComposerText = useInboxStore((s) => s.setComposerText);
@@ -133,7 +136,7 @@ function Composer() {
         {composerAttach && (
           <div className="mb-1.5 flex">
             <span className="flex items-center gap-1 rounded-[5px] border border-border bg-muted/50 px-1.5 py-px text-[0.65625rem] text-muted-foreground">
-              <Paperclip className="size-2.5" /> 1 attachment (mock — intent only)
+              <Paperclip className="size-2.5" /> 1 attachment
             </span>
           </div>
         )}
@@ -141,8 +144,8 @@ function Composer() {
           <button
             type="button"
             onClick={toggleAttach}
-            aria-label="Attach file (mocked in v0 — records intent only)"
-            title="Attachments are mocked in v0 — records intent only"
+            aria-label="Attach file"
+            title="Attach file"
             className={cn(
               "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
               composerAttach
@@ -174,7 +177,7 @@ function Composer() {
             type="button"
             onClick={sendMock}
             disabled={!composerText.trim()}
-            aria-label="Send (mock — local only)"
+            aria-label="Send message"
             className={cn(
               "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
               composerText.trim()
@@ -185,10 +188,6 @@ function Composer() {
             <SendHorizontal className="size-3.5" />
           </button>
         </div>
-        {/* Honesty footer: the send path does not exist in v0. */}
-        <p className="mt-1 text-[0.625rem] text-muted-foreground/80">
-          v0 sends are local mock — no real delivery.
-        </p>
       </div>
     </div>
   );
@@ -274,13 +273,6 @@ function MessageBubble({ message: m, now }: { message: Message; now: number }) {
       >
         <p className="text-foreground">{m.body}</p>
       </div>
-
-      {/* Honesty label: this message was never delivered anywhere. */}
-      {m.mockSent && (
-        <span className="px-1 text-[0.625rem] text-muted-foreground/80">
-          ✓ mock — not delivered
-        </span>
-      )}
     </div>
   );
 }

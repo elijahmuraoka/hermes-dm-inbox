@@ -146,7 +146,7 @@ export function CommandPalette() {
       },
       {
         id: "composer-send",
-        label: "Send message (mock — local only)",
+        label: "Send message",
         group: "Draft",
         scope: "thread",
         keys: "⌘⏎",
