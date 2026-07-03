@@ -100,12 +100,13 @@ Hermes/draft:
 | `r` | regenerate draft when draft focused |
 | `x` | reject draft |
 
-Sharing (see the Privacy/sharing UX section — bodies are always visible to the human):
+Sharing is thread-level and default-on for drafting (see Privacy/sharing UX) — `d` is the share; the
+per-thread Block/Allow opt-out lives in the thread strip and palette.
 
 | Key | Action |
 |---|---|
-| `Shift+V` | share selected body with Hermes for the current task |
-| `Esc` | close modal |
+| `1` `2` `3` | pick a draft angle (warm / direct / brief) |
+| `Esc` | close modal / sheet / drawer |
 
 ## Command palette taxonomy
 
@@ -155,11 +156,13 @@ Hermes should not:
 
 ## Draft workflow
 
-Draft lifecycle:
+Draft lifecycle (v0: requesting a draft returns **three angled candidates** — 1 warm · 2 direct · 3 brief —
+picked by number key; the pick becomes the working version):
 
 ```text
 not_started
-→ requested
+→ requested            (thread shared with Hermes here, unless blocked)
+→ angles_ready         (three candidates; pick with 1/2/3)
 → generated
 → edited
 → approved_intent
@@ -188,31 +191,47 @@ Draft controls:
 
 ## Privacy/sharing UX
 
-> **DECISION — Elijah, 2026-07-03 (supersedes the earlier redacted/revealed/shared tri-state).**
-> Hermes DM Inbox is a **single-user, local** app. Redacting a message body *from the human who owns it* is
-> friction with no benefit, so it is removed entirely: **message bodies are always fully visible to the
-> user** — no blur, no "reveal to me" step, no `v` shortcut, no human-view audit event.
+> **DECISION v2 — Elijah, 2026-07-03 (supersedes per-message sharing).** Sharing is **thread-level and
+> default-on for drafting**: pressing `d` means Hermes reads the full thread — that is the point of asking
+> it to draft. Per-message share links and the `⇧V`/`z` machinery are removed.
 >
-> The only privacy boundary that carries weight is **what enters the agent's context**. The model therefore
-> collapses to a **binary** per message:
+> (v1, same day, still holds: this is a single-user local app — bodies are **always fully visible to the
+> user**; no blur, no reveal step, no human-view audit events.)
+
+The model in one line: **metadata-only until you ask for a draft; asking = the thread is shared.**
 
 | State | Meaning | Visual treatment |
 |---|---|---|
-| Not shared (default) | body is visible to you but **not** in Hermes' context | **no chrome at all** |
-| Shared with Hermes | body is in Hermes' context for the current task | one subtle amber "share" badge (+ audit) |
+| Unshared (default) | bodies visible to you; Hermes has metadata only | **no chrome at all** |
+| Shared thread | thread bodies are in Hermes' context (a draft was requested) | amber "Hermes sees this thread" chip + amber row tick (+ audit) |
+| Blocked (opt-out) | per-thread toggle: Hermes stays metadata-only even for drafts | quiet "Hermes blocked" chip + Allow toggle |
 
 Rules:
 
-- Hermes drafts from **metadata only by default**; it sees full bodies only after an explicit share.
-- Sharing is an explicit, **reversible** act (`Shift+V` / "Share with Hermes"; "Unshare from Hermes" undoes it).
-- A shared body raises the draft panel's body-policy line from `metadata_only` to `explicit_full_body`.
-- The agent still cannot grant itself body access; sharing is always a human action, and it is audited.
+- Hermes drafts from **metadata only** until you ask for a draft; the ask shares the full thread (audited
+  once, as `hermes.thread_share`).
+- The per-thread **opt-out is reversible** (Block/Allow, both audited). Blocking pins future drafts to
+  metadata-only; it does not un-happen a past share (the amber state remains as historical fact).
+- The draft panel's body-policy pill is **live**: "Full thread" by default, "Metadata only" when blocked.
+- The agent still cannot grant itself body access: the share happens only as a consequence of the human's
+  draft request, and the opt-out is human-only.
 
-Sharing copy should be explicit:
+### Bucket semantics (Elijah addendum, 2026-07-03)
 
-- “Share with Hermes”
-- “Hermes will receive this message body for this drafting task.”
-- “Unshare from Hermes”
+Elijah flagged that Needs Reply / Waiting / FYI read as overlapping. The internal model is crisp — the
+buckets answer **"whose court is the ball in?"** — but the names didn't carry it. Resolution:
+
+1. **Renames + visible semantics:** "Waiting" → **"Waiting on them"**; every bucket shows a one-line
+   description under the list header (Needs Reply = "The ball is in your court"; Waiting on them = "You
+   acted; the ball is in their court"; FYI = "No reply expected — read and move on"; Done = "Handled").
+2. **Fixture audit:** mock triage content is bucket-coherent by construction — the generator assigns
+   snippets from per-bucket pools (needs = direct question to you, incoming; waiting = your outgoing ask;
+   fyi = pure broadcast, nothing owed; done = closed confirmation), so no fixture plausibly straddles two.
+3. **Structural question (open, for Elijah):** the residual overlap is **FYI vs Done** — both are "no
+   action". FYI is really a *triage suggestion* ("no reply expected"), not a resting place; after reading,
+   an FYI is effectively Done. Proposal if simplification is wanted: **four buckets** — Needs Reply /
+   Drafted / Waiting on them / **No action** (FYI+Done merged; unread dots surface the new-but-ignorable
+   items). Not implemented — five buckets stand until Elijah picks.
 
 ## Search UX
 

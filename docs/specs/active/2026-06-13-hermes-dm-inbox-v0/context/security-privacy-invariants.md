@@ -67,45 +67,37 @@ Requirements:
 
 Phase 0 can model the vault boundary without full encryption, but tests must already prove raw bodies do not leak into index/list/search/audit surfaces.
 
-## Reveal model
+The vault boundary is enforced in code: vault tables live in a separate SQLite file (`vault.db`), primitives gate access through a `VaultService` that enforces reveal policy. Phase 1 adds OS-keychain-backed encryption.
 
-There are two separate actions:
+## Sharing model
 
-### Reveal to human
+> **DECISION — Elijah, 2026-07-03 (v1 + v2; supersedes the reveal model below-referenced elsewhere).**
+> v1: this is a single-user local app — bodies are **always visible to the human**; there is no
+> reveal-to-human step and no human-view audit. v2: sharing to Hermes is **thread-level and default-on for
+> drafting** — *metadata-only until you ask for a draft; asking shares the full thread.*
 
-The local UI/CLI shows selected message bodies to the human user.
+### Share to Hermes (the one gate)
 
-Rules:
-
-- scoped to selected message/thread
-- audited
-- does not automatically share with Hermes
-- visible UI state: body revealed locally
-
-### Reveal/share to Hermes
-
-The selected bodies are included in a Hermes draft/summary/triage prompt.
+The thread's bodies are included in Hermes' draft/summary/triage context.
 
 Rules:
 
-- explicit action
-- scoped to exact message IDs or thread window
-- scoped to one session/task/purpose
-- short-lived if represented as a grant
-- audited separately from human reveal
-- model provider/locality recorded
-- never created by the model itself
-- never implicit because a human viewed the body
+- happens only as a consequence of the human's draft request (`d`) — never spontaneously
+- scoped to the thread being drafted, one task/purpose
+- audited (`hermes.thread_share`, once per thread), model provider/locality recorded
+- **per-thread opt-out** (Block/Allow) is human-only, reversible, and audited both directions; a blocked
+  thread pins Hermes to metadata-only even for drafts
+- never created by the model itself; the opt-out cannot be flipped by the model
+- prompt-injection inside messages cannot alter the sharing policy
 
 ## Body policies
 
 | Policy | Behavior |
 |---|---|
-| `metadata_only` | no message text |
-| `redacted_preview` | bounded previews only |
-| `explicit_full_body` | selected bodies included after explicit user action |
+| `metadata_only` | no message text — the resting default, and the ceiling for blocked threads |
+| `full_thread` | the thread's bodies enter Hermes' context because the user asked for a draft |
 
-Default: `redacted_preview` or stricter.
+Default: `metadata_only` until a draft is requested.
 
 ## Hermes prompt policy
 
@@ -128,7 +120,7 @@ Rules:
 
 ## Local server boundary
 
-The local server is privileged.
+The local server is privileged. Implemented as a Hono app with Zod validation.
 
 Requirements:
 
@@ -143,6 +135,8 @@ Requirements:
 - errors/logs never include raw bodies
 
 Important: localhost is not automatically trusted. If Hermes can run `curl localhost`, reveal still needs explicit user-created authorization.
+
+Additionally: the `hdi` CLI imports primitives directly (not via REST), so it bypasses the REST auth layer. This is acceptable because CLI execution requires local shell access — the same trust boundary as running the server process itself. If the CLI is ever exposed remotely (Tailscale/SSH), the direct-import path must be reconsidered.
 
 ## CLI and skill boundary
 
@@ -197,6 +191,8 @@ Audit must not contain:
 - vault keys
 - reusable reveal tokens
 
+Phase 0 implements a simple append-only audit_logs table. Tamper-evident integrity (hash chains) is a Phase 1+ hardening task.
+
 ## Send-path invariant
 
 No actual send path in v0.
@@ -223,12 +219,12 @@ Mandatory future send rules:
 
 ## Non-negotiable invariants
 
-1. No raw bodies in list/search/default thread responses.
+1. No raw bodies in API list/search surfaces that Hermes can read without a share.
 2. No raw bodies in audit/log/error output.
 3. No raw bodies in index/FTS tables unless a future explicit encrypted/search design exists.
-4. Human reveal is separate from Hermes reveal/share.
-5. Hermes cannot grant itself body access.
-6. Full-body Hermes context requires explicit user action.
+4. Bodies are always visible to the human (single-user local app); the gate is Hermes' context only.
+5. Hermes cannot grant itself body access, and cannot flip a thread's Block/Allow opt-out.
+6. Full-thread Hermes context happens only via the user's draft request; blocked threads stay metadata-only.
 7. Message content is untrusted prompt data.
 8. No send path in v0.
 9. Mock/synthetic fixtures only in public repo.
