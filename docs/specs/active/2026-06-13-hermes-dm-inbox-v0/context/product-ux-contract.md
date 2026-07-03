@@ -93,10 +93,12 @@ Hermes/draft:
 | Key | Action |
 |---|---|
 | `d` | draft reply |
+| `c` | focus composer (reply) |
+| `Cmd+Enter` | send from composer (v0: local mock) |
 | `Shift+D` | draft with custom instructions |
 | `t` | triage selected/thread |
 | `m` | summarize thread |
-| `a` | approve draft intent |
+| `e` | add picked draft to chat (contextual; otherwise mark done) |
 | `r` | regenerate draft when draft focused |
 | `x` | reject draft |
 
@@ -156,17 +158,19 @@ Hermes should not:
 
 ## Draft workflow
 
-Draft lifecycle (v0: requesting a draft returns **three angled candidates** — 1 warm · 2 direct · 3 brief —
-picked by number key; the pick becomes the working version):
+Draft lifecycle (v3, composer-first — Elijah 2026-07-03: drafts are PREFILLS; the composer is the ONE
+editing surface; the approve-intent ceremony is retired — sending is the intent gesture):
 
 ```text
 not_started
 → requested            (thread shared with Hermes here, unless blocked)
-→ angles_ready         (three candidates; pick with 1/2/3)
-→ generated
-→ edited
-→ approved_intent
-→ future send_queued / sent
+→ angles_ready         (three candidates: warm/direct/brief; pick with 1/2/3)
+→ generated            (picked; read-only card, "Add to chat" is the primary action)
+→ added_to_chat        (prefilled into the composer)
+→ edited               (composer text diverged from the Hermes draft)
+→ sent_mock            (sent from the composer — v0 = LOCAL MOCK, no real delivery;
+                        audited as draft.sent_mock, the intent record)
+→ future: real send path (send_queued / sent) replaces the mock
 ```
 
 Draft panel requirements:
@@ -177,7 +181,8 @@ Draft panel requirements:
 - supports regenerate with reason
 - supports tone/length controls
 - stores versions
-- approval records intent only until send path exists
+- sending a Hermes-originated draft from the composer records the intent (audit `draft.sent_mock`);
+  v0 "send" is a local mock append, honestly labeled — no real delivery exists
 
 Draft controls:
 
