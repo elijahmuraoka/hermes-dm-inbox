@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { BucketNav } from "@/components/BucketNav";
-import { BucketBar } from "@/components/BucketBar";
 import { Topbar } from "@/components/Topbar";
 import { ConversationList } from "@/components/ConversationList";
 import { Thread } from "@/components/Thread";
@@ -19,6 +18,8 @@ export default function App() {
   const mobilePane = useInboxStore((s) => s.mobilePane);
   const draftSheetOpen = useInboxStore((s) => s.draftSheetOpen);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
+  const drawerOpen = useInboxStore((s) => s.drawerOpen);
+  const setDrawer = useInboxStore((s) => s.setDrawer);
   const setBucket = useInboxStore((s) => s.setBucket);
 
   // Mock initial sync → ready, then select the first row (shows skeletons briefly).
@@ -41,28 +42,27 @@ export default function App() {
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-      {/* Left rail: full cockpit only at xl+. Below that, buckets live in ⌘K / g-nav. */}
-      <div className="hidden xl:flex">
+      {/* Left rail: buckets + sources live in the side rail from md up (Elijah's
+          call — no top chip bar at tablet widths). Below md it's the drawer. */}
+      <div className="hidden md:flex">
         <BucketNav />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        {/* Touch-reachable bucket switch when the rail is hidden (≤ xl). Keyboard stays primary. */}
-        <BucketBar />
         <main className="flex min-h-0 flex-1">
           <h1 className="sr-only">Hermes DM Inbox</h1>
-          {/* List — full width on mobile, fixed rail on desktop. Hidden on mobile when a thread is open. */}
+          {/* List — full width in single-pane mode, fixed rail from lg. */}
           <div
             className={cn(
-              "min-w-0 flex-1 lg:max-w-[360px] xl:max-w-[400px] lg:flex-none",
+              "min-w-0 flex-1 lg:max-w-[340px] xl:max-w-[380px] lg:flex-none",
               mobilePane === "thread" ? "hidden lg:block" : "block",
             )}
           >
             <ConversationList />
           </div>
 
-          {/* Thread — hidden on mobile until opened; always present lg+. */}
+          {/* Thread — single-pane below lg; side-by-side from lg. */}
           <div
             className={cn(
               "min-w-0 flex-1 border-r border-border",
@@ -72,20 +72,39 @@ export default function App() {
             {showThread ? <Thread conversation={selected} /> : <NoSelection />}
           </div>
 
-          {/* Draft panel — persistent side rail at lg+. */}
+          {/* Draft panel — persistent side rail at xl+ (rail+list+thread+panel
+              needs the room); below xl it's the bottom sheet. */}
           {selected && (
-            <div className="hidden lg:flex">
+            <div className="hidden xl:flex">
               <HermesDraftPanel conversation={selected} />
             </div>
           )}
         </main>
       </div>
 
-      {/* Below lg the hero loop lives in a bottom sheet — opened by `d`, the
+      {/* Mobile drawer (<md): hamburger → the same bucket/source rail. */}
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 z-40 flex bg-black/45 backdrop-blur-sm md:hidden"
+          onClick={() => setDrawer(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Buckets and sources"
+            className="animate-drawer-in h-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <BucketNav />
+          </div>
+        </div>
+      )}
+
+      {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
           thread's Draft button, or any draft request. Never a silent mutation. */}
       {selected && draftSheetOpen && (
         <div
-          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm xl:hidden"
           onClick={() => setDraftSheet(false)}
         >
           <div

@@ -28,6 +28,22 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
 - **Nit — audit/share log surface** (`g a`): audit events are recorded in the store but there is no
   UI to inspect them yet; `g a` currently opens the shortcut sheet as a stand-in.
 
+## Phase 1 — from Elijah's deploy review (2026-07-03)
+
+- **Email connector via `gog`.** Bring Gmail into the inbox. Needs a real modeling pass first:
+  subject lines, cc/bcc participants, and email threading (References/In-Reply-To) don't map 1:1
+  onto the DM conversation model — decide whether email threads are conversations, how subject
+  changes split threads, and how cc/bcc render in the ledger row.
+- **Group DMs / group chats.** Current model is strictly 1:1 (one person per conversation).
+  Group modeling touches participants, avatars/initials, "needs reply" semantics (who was
+  addressed?), and triage suggestions.
+- **Chat-iteration on drafts + send-in-place.** After picking an angle: iterate on the draft in a
+  chat exchange with Hermes (with thread context), and send directly from the panel. Send requires
+  the full send-path spec (single-use approval, expiry, edit-invalidates) — deliberately absent
+  from v0, where approve records intent only.
+- **Bucket taxonomy decision (awaiting Elijah).** Five buckets stand; the ux-contract records a
+  four-bucket proposal (merge FYI+Done into "No action") if the FYI/Done overlap keeps biting.
+
 ## Phase 0 leftovers (pre-review)
 
 - Draft panel below `lg` is a bottom sheet (shipped); evaluate whether a persistent mini-bar beats

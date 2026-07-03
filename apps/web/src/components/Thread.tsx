@@ -3,15 +3,15 @@ import { SOURCE_META } from "@/lib/types";
 import { PEOPLE } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { cn, relTime } from "@/lib/utils";
-import { SharedBadge } from "@/components/SharedBadge";
-import { ChevronLeft, Share2, Wand2, X } from "lucide-react";
+import { SourceIcon } from "@/components/SourceIcon";
+import { ChevronLeft, Share2, ShieldOff, Wand2 } from "lucide-react";
 
 export function Thread({ conversation: c }: { conversation: Conversation }) {
   const person = PEOPLE[c.personId];
   const now = useInboxStore((s) => s.now);
   const backToList = useInboxStore((s) => s.backToList);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
-  const hasDraft = c.draft.versions.length > 0;
+  const hasDraft = c.draft.versions.length > 0 || c.draft.status === "angles_ready";
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -43,33 +43,46 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
             />
           )}
         </div>
-        <span className="tnum ml-1 rounded-[5px] border border-border px-1.5 py-px font-mono text-[10px] text-muted-foreground">
+        <span
+          className="ml-1 flex shrink-0 items-center gap-1 rounded-[5px] border border-border px-1.5 py-px text-[10px] text-muted-foreground"
+          title={SOURCE_META[c.source].label}
+        >
+          <SourceIcon source={c.source} className="size-3" />
           {SOURCE_META[c.source].label}
         </span>
         <span className="ml-auto hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
           {person.handle}
         </span>
-        {/* Below lg the side panel doesn't exist — the hero loop needs a visible door. */}
+        {/* Below xl the side panel doesn't exist — the hero loop needs a visible door. */}
         <button
           type="button"
           onClick={() => setDraftSheet(true)}
-          className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-primary/20 sm:ml-2 lg:hidden"
+          className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-primary/20 sm:ml-2 xl:hidden"
         >
           <Wand2 className="size-3.5 text-primary" strokeWidth={2.25} />
           {hasDraft ? "View draft" : "Draft"}
         </button>
       </div>
 
-      {/* hermes triage rationale */}
-      {c.hermesSuggestion && (
-        <div className="flex items-start gap-2 border-b border-border bg-muted/25 px-4 py-2">
-          <span
-            className="mt-px font-mono text-[9.5px] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--agent-label)" }}
-          >
-            Hermes
+      {/* hermes strip: triage rationale + the thread-level share state */}
+      {(c.hermesSuggestion || c.threadShared || c.hermesBlocked) && (
+        <div className="flex items-center gap-2 border-b border-border bg-muted/25 px-4 py-2">
+          {c.hermesSuggestion && (
+            <>
+              <span
+                className="mt-px shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--agent-label)" }}
+              >
+                Hermes
+              </span>
+              <p className="min-w-0 truncate text-[12px] leading-snug text-muted-foreground">
+                {c.hermesSuggestion}
+              </p>
+            </>
+          )}
+          <span className="ml-auto shrink-0">
+            <ThreadShareState conversation={c} />
           </span>
-          <p className="text-[12px] leading-snug text-muted-foreground">{c.hermesSuggestion}</p>
         </div>
       )}
 
@@ -86,9 +99,64 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
   );
 }
 
+/** The thread-level sharing state — the one privacy signal, plus its opt-out. */
+function ThreadShareState({ conversation: c }: { conversation: Conversation }) {
+  const toggleHermesAccess = useInboxStore((s) => s.toggleHermesAccess);
+
+  if (c.hermesBlocked) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span
+          className="inline-flex items-center gap-1 rounded-[5px] border border-border px-1.5 py-px text-[10.5px] font-medium text-muted-foreground"
+          title="Hermes is blocked from this thread — drafts use metadata only"
+        >
+          <ShieldOff className="size-2.5" strokeWidth={2.5} />
+          Hermes blocked
+        </span>
+        <button
+          type="button"
+          onClick={toggleHermesAccess}
+          className="text-[10.5px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+        >
+          Allow
+        </button>
+      </span>
+    );
+  }
+
+  if (c.threadShared) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span
+          role="img"
+          aria-label="Hermes sees this thread"
+          className="inline-flex items-center gap-1 rounded-[5px] border px-1.5 py-px text-[10.5px] font-medium"
+          style={{
+            color: "var(--priv-shared)",
+            borderColor: "color-mix(in oklch, var(--priv-shared) 45%, transparent)",
+            backgroundColor: "color-mix(in oklch, var(--priv-shared) 12%, transparent)",
+          }}
+          title="This thread's messages are in Hermes' context"
+        >
+          <Share2 className="size-2.5" strokeWidth={2.5} />
+          Hermes sees this thread
+        </span>
+        <button
+          type="button"
+          onClick={toggleHermesAccess}
+          className="text-[10.5px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+          title="Block Hermes from reading this thread's bodies in future drafts"
+        >
+          Block
+        </button>
+      </span>
+    );
+  }
+
+  return null; // default state carries zero chrome
+}
+
 function MessageBubble({ message: m, now }: { message: Message; now: number }) {
-  const shareWithHermes = useInboxStore((s) => s.shareWithHermes);
-  const unshareFromHermes = useInboxStore((s) => s.unshareFromHermes);
   const mine = m.direction === "out";
   const author = mine ? PEOPLE.me : PEOPLE[m.authorId];
 
@@ -99,41 +167,17 @@ function MessageBubble({ message: m, now }: { message: Message; now: number }) {
         <span className="tnum font-mono text-[10px] tabular-nums text-muted-foreground">
           {relTime(m.timestamp, now)}
         </span>
-        <SharedBadge shared={m.sharedWithHermes} />
       </div>
 
       <div
         className={cn(
-          "group max-w-[min(85%,68ch)] rounded-xl border px-3 py-2 text-[13px] leading-relaxed",
+          "max-w-[min(85%,68ch)] rounded-xl border px-3 py-2 text-[13px] leading-relaxed",
           mine
             ? "border-primary/25 bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
             : "border-border bg-card",
-          m.sharedWithHermes && "border-[color-mix(in_oklch,var(--priv-shared)_35%,transparent)]",
         )}
       >
         <p className="text-foreground">{m.body}</p>
-
-        {/* The one gate: opt a body into Hermes' context. Only for incoming bodies. */}
-        {!mine &&
-          (m.sharedWithHermes ? (
-            <button
-              type="button"
-              onClick={() => unshareFromHermes(m.id)}
-              className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-              title="Remove this body from Hermes' context"
-            >
-              <X className="size-3" /> Unshare from Hermes
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => shareWithHermes(m.id)}
-              className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-              title="Include this body in Hermes' context for drafting"
-            >
-              <Share2 className="size-3" /> Share with Hermes
-            </button>
-          ))}
       </div>
     </div>
   );

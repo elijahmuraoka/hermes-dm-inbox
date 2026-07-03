@@ -130,25 +130,17 @@ export function CommandPalette() {
         run: withClose(() => approveDraft()),
         disabled: !selected || selected.draft.versions.length === 0,
       },
-      // Privacy — the one gate
+      // Privacy — the thread-level gate. Drafting shares the thread by default;
+      // this is the per-thread opt-out (and its undo).
       {
-        id: "priv-share",
-        label: "Share next body with Hermes",
+        id: "priv-toggle",
+        label: selected?.hermesBlocked
+          ? "Allow Hermes to read this thread"
+          : "Block Hermes from this thread",
         group: "Privacy",
         scope: "thread",
-        keys: "⇧V",
         icon: Share2,
-        run: withClose(() => useInboxStore.getState().shareNext()),
-        disabled: !selected,
-      },
-      {
-        id: "priv-unshare",
-        label: "Undo last share",
-        group: "Privacy",
-        scope: "thread",
-        keys: "z",
-        icon: Share2,
-        run: withClose(() => useInboxStore.getState().unshareLast()),
+        run: withClose(() => useInboxStore.getState().toggleHermesAccess()),
         disabled: !selected,
       },
       // Help
@@ -213,12 +205,14 @@ export function CommandPalette() {
           className="flex flex-col"
           label="Command palette"
         >
-          <div className="flex items-center gap-2 border-b border-border px-3">
+          {/* Single standard --ring treatment on the row (focus-within); the
+              input itself is bare so we never stack two outlines. */}
+          <div className="flex items-center gap-2 border-b border-border px-3 transition-shadow focus-within:shadow-[inset_0_0_0_1px_var(--ring)]">
             <Search className="size-4 text-muted-foreground" />
             <Command.Input
               autoFocus
               placeholder="Type a command or search…"
-              className="h-11 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+              className="h-11 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
             />
             <Kbd>esc</Kbd>
           </div>

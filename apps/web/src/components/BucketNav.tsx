@@ -3,7 +3,8 @@ import { BUCKET_META, SOURCE_META, type Bucket, type SourceId } from "@/lib/type
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Kbd } from "@/components/ui/kbd";
-import { Zap } from "lucide-react";
+import { SourceIcon } from "@/components/SourceIcon";
+import { Layers, Zap } from "lucide-react";
 
 const ORDER: Bucket[] = ["needs", "drafted", "waiting", "fyi", "done"];
 
@@ -88,9 +89,9 @@ export function BucketNav() {
         <p className="px-1.5 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Sources
         </p>
-        <SourceItem id="all" label="All sources" glyph="∗" />
+        <SourceItem id="all" label="All sources" />
         {(Object.keys(SOURCE_META) as SourceId[]).map((s) => (
-          <SourceItem key={s} id={s} label={SOURCE_META[s].label} glyph={SOURCE_META[s].glyph} />
+          <SourceItem key={s} id={s} label={SOURCE_META[s].label} />
         ))}
       </div>
 
@@ -104,15 +105,7 @@ export function BucketNav() {
   );
 }
 
-function SourceItem({
-  id,
-  label,
-  glyph,
-}: {
-  id: SourceId | "all";
-  label: string;
-  glyph: string;
-}) {
+function SourceItem({ id, label }: { id: SourceId | "all"; label: string }) {
   const sourceFilter = useInboxStore((s) => s.sourceFilter);
   const setSourceFilter = useInboxStore((s) => s.setSourceFilter);
   const active = sourceFilter === id;
@@ -129,8 +122,12 @@ function SourceItem({
           : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
       )}
     >
-      <span className="flex w-5 shrink-0 justify-center font-mono text-[10px] text-muted-foreground">
-        {glyph}
+      <span className="flex w-5 shrink-0 justify-center text-muted-foreground">
+        {id === "all" ? (
+          <Layers className="size-3.5" strokeWidth={2} />
+        ) : (
+          <SourceIcon source={id} className="size-3.5" muted={!active} />
+        )}
       </span>
       <span className="truncate">{label}</span>
     </button>

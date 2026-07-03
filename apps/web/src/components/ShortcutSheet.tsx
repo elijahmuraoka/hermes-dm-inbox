@@ -29,13 +29,12 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
     ],
   },
   {
-    title: "Hermes & sharing",
+    title: "Hermes & drafting",
     rows: [
-      ["d", "Draft reply (opens panel)"],
+      ["d", "Draft reply — shares this thread with Hermes"],
+      ["1 2 3", "Pick a draft angle (warm / direct / brief)"],
       ["a", "Approve draft intent"],
       ["r", "Regenerate (draft focused)"],
-      ["⇧V", "Share next body with Hermes"],
-      ["z", "Undo last share"],
       ["Esc", "Close modal / sheet"],
     ],
   },

@@ -30,6 +30,7 @@ export function useKeyboard() {
         if (st.paletteOpen) st.setPalette(false);
         if (st.shortcutsOpen) st.setShortcuts(false);
         if (st.draftSheetOpen) st.setDraftSheet(false);
+        if (st.drawerOpen) st.setDrawer(false);
         return;
       }
       if (st.paletteOpen) return; // palette owns keys while open
@@ -78,12 +79,15 @@ export function useKeyboard() {
           return void st.requestDraft();
         case "a":
           return void st.approveDraft();
-        case "V":
-          // Shift+V: share the next not-yet-shared incoming body with Hermes.
-          return void st.shareNext();
-        case "z":
-          // z: undo the sharing gate — unshare the most recent shared body.
-          return void st.unshareLast();
+        case "1":
+        case "2":
+        case "3":
+          // Pick a draft angle when three candidates are pending.
+          if (st.selected()?.draft.status === "angles_ready") {
+            e.preventDefault();
+            st.chooseAngle(Number(e.key) as 1 | 2 | 3);
+          }
+          return;
         case "r":
           return void st.regenerateDraft("Regenerate");
         default:

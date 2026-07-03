@@ -98,19 +98,19 @@ Define once, both themes. Components reference these, never raw colors.
 | `--urgency-high`  | urgent | `--destructive` | `--destructive` |
 | `--status-unread` | unread dot/weight | `--primary` | `--primary` |
 | **Sharing gate (the one privacy signal) ↓** | | | |
-| `--priv-shared`   | body is in Hermes' context | subtle amber "share" badge | subtle amber badge |
+| `--priv-shared`   | thread is in Hermes' context | amber "Hermes sees this thread" chip + row tick | same |
 
-> **DECISION — Elijah, 2026-07-03 (supersedes the earlier tri-state).** Redacting message bodies *from the
-> human* is dead. This is a single-user local app; hiding your own messages from yourself is friction with no
-> benefit. Bodies are **always fully visible to you** — no blur, no "reveal to me", no `v` step, no human-view
-> audit event. The privacy model collapses to a **binary**: *not-shared* (default, **zero visual noise**) vs
-> *shared-with-Hermes* (**one subtle amber badge** on the message + the body-policy line in the draft panel).
+> **DECISION v2 — Elijah, 2026-07-03 (supersedes per-message sharing).** Sharing is **thread-level and
+> default-on for drafting**: pressing `d` means Hermes reads the full thread — that's the point of asking it
+> to draft. No per-message share links, no `⇧V`/`z` machinery. The amber signal stays (it's the identity
+> element): an **"Hermes sees this thread" chip** in the thread strip + the **amber row tick**, with a
+> **per-thread opt-out toggle** (Block/Allow, audited) that pins drafts to metadata-only.
+> (v1 — same day — killed redaction-from-the-human: bodies are always fully visible to you; no blur, no
+> reveal step, no human-view audit.)
 
-**The sharing gate is the one place to spend privacy design capital.** Hermes drafts from **metadata by
-default**; pulling full bodies into its context is an explicit, reversible act (`⇧V` / "Share with Hermes",
-undoable). *Shared* must be legible at a glance — amber `Share2` badge, consistent on the message and the row
-— while a *not-shared* message stays completely quiet (no badge at all). Making "shared" unmistakable without
-adding any chrome to the default is the Phase-0 acceptance gate (was contract risk #4).
+**The sharing model in one line:** *metadata-only until you ask for a draft; asking = the thread is shared.*
+The amber treatment must stay legible at a glance (chip + tick + the live body-policy pill in the draft
+panel), while unshared threads carry **zero privacy chrome**.
 
 ---
 
@@ -144,21 +144,25 @@ Each ships with **all states** — default · hover · focus-visible · selected
 · disabled. States are first-class (canon: missing states = defect).
 
 1. **ConversationRow** — **LOCKED: the "ledger" treatment** (bake-off winner, Elijah 2026-07-03; "edge" and
-   "card" variants deleted). Single-line 40px: unread dot slot · mono source glyph · fixed-width name (148px)
-   · urgency/draft dots · flex preview · tabular time. Selection = full-row primary wash + inset ring;
-   **shared-with-Hermes = glowing amber tick on the left edge** (no avatar, no per-row chips). `j/k` moves
-   selection, `Enter` opens.
-2. **BucketNav** — the 5 buckets with live counts (tabular); active bucket uses `--primary` edge. `g i/g d/g a`.
-3. **Thread** — message list; **every body is fully readable** (no blur, no reveal). Incoming bodies carry a
-   quiet "Share with Hermes" affordance; shared bodies flip to the amber shared badge (undoable).
-4. **HermesDraftPanel** — draft lifecycle badge (`requested→generated→edited→approved_intent`), instructions
-   used, **body-policy indicator** (metadata-only by default / full-body once shared), tone/length controls
-   (warmer/shorter/direct…), regenerate-with-reason, version list, approve-intent. Hermes = embedded co-pilot,
-   not a chat bubble sidebar.
-5. **CommandPalette (⌘K)** — categorized (Navigate/Sync/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
+   "card" variants deleted). Single-line 40px: unread dot slot · **brand source icon** (inline SVG, no mono
+   text tags) · fixed-width name (148px) · urgency/draft dots · flex preview · tabular time. Selection =
+   full-row primary wash + inset ring; **thread-shared = glowing amber tick on the left edge** (no avatar,
+   no per-row chips). `j/k` moves selection, `Enter` opens.
+2. **BucketNav** — buckets (with a one-line semantics `desc` under the list header: whose court is the ball
+   in?) + sources with brand icons, live counts (tabular); active bucket uses `--primary` edge. Lives in the
+   **side rail from `md` up**; below `md` it's a **hamburger → left drawer** (no top chip bar at tablet
+   widths — Elijah's call). `g i/g d/g a` unchanged.
+3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message chrome).
+   The Hermes strip carries the thread-level state: amber **"Hermes sees this thread"** chip once shared,
+   **Block/Allow** opt-out toggle, nothing when unshared.
+4. **HermesDraftPanel** — lifecycle (`requested→angles_ready→generated→edited→approved_intent`); on `d`
+   Hermes returns **three angled candidates (1 warm · 2 direct · 3 brief)** picked by number key; live
+   **body-policy pill** (Full thread by default / Metadata only when blocked); tone controls,
+   regenerate-with-reason, version list, approve-intent. Side rail at `xl+`, bottom sheet below.
+5. **CommandPalette (⌘K)** — categorized (Navigate/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.
-6. **SharedBadge** — the binary signal from §3; renders **nothing** when not shared, one subtle amber badge
-   when shared. Reused in row and thread.
+6. **ThreadShareState** — the thread-level signal from §3 (chip + toggle in the Thread strip); the row tick
+   mirrors it. Renders **nothing** for unshared, unblocked threads.
 7. **Keycap / focus system** — every interactive element has a **visible `:focus-visible` ring** (`--ring`);
    keyboard path is primary, mouse secondary. `?` opens the shortcut sheet.
 8. **StatusStates** — shared skeleton (shimmer via house curve), empty ("Needs Reply is clear" — calm, not a
@@ -193,13 +197,12 @@ A slice is done only when, on a **real running app with mock data**, rendered an
 `375 · 768 · 1024 · 1440 · 1920` in **both themes**:
 
 1. Fast inbox list, keyboard nav (`j/k`, `Enter`, `u`), selected-row treatment correct.
-2. Open a thread; **every body is fully readable** (no blur, no reveal step). Default messages carry **no
-   privacy chrome**.
-3. Sharing a body into Hermes (`⇧V` / "Share with Hermes") flips that message to a **subtle amber shared
-   badge**, undoable; the *shared* vs *not-shared* distinction is instantly legible without reading labels.
+2. Open a thread; **every body is fully readable**; unshared threads carry **zero privacy chrome**.
+3. Ask for a draft (`d`): the thread flips to the **amber "Hermes sees this thread"** state (chip + row
+   tick), instantly legible without reading labels; the **Block/Allow** opt-out works and is audited.
 4. `⌘K` palette opens <100ms, categorized, keyboard-only usable; `?` shows shortcuts.
-5. Ask mock Hermes to draft (`d`); draft lifecycle + body-policy line (**metadata-only by default**, full-body
-   only after a share) visible; approve intent (`a`).
+5. `d` returns **three angles**; `1/2/3` picks one; lifecycle + live body-policy pill (**Full thread**
+   default, **Metadata only** when blocked) visible; approve intent (`a`).
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.

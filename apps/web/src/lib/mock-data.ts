@@ -46,6 +46,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "high",
     unread: true,
     lastActivity: iso(7),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "Direct question about Thursday; likely needs a reply today.",
     messages: [
       {
@@ -55,7 +57,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(41),
         preview: "Hey — did you get a chance to look at the deck?",
         body: "Hey — did you get a chance to look at the deck? I want to send it out before the Thursday sync so we're all aligned.",
-        sharedWithHermes: false,
       },
       {
         id: "c1m2",
@@ -64,7 +65,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(7),
         preview: "Also can we push our call to 3pm?",
         body: "Also can we push our call to 3pm? Something came up in the morning and I'd hate to rush it.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -82,6 +82,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: true,
     lastActivity: iso(52),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "Warm intro request; a short yes/no keeps momentum.",
     messages: [
       {
@@ -91,7 +93,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(52),
         preview: "Loved your talk — would you be open to a quick intro to…",
         body: "Loved your talk at the meetup — would you be open to a quick intro to our head of platform? She's exploring exactly the local-first space you described.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -109,6 +110,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(96),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "Follow-up on the API question you left open two days ago.",
     messages: [
       {
@@ -118,7 +121,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(96),
         preview: "Any update on whether the webhook signing is documented?",
         body: "Any update on whether the webhook signing is documented anywhere? Happy to open a PR if not.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -136,6 +138,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(140),
+    threadShared: true,
+    hermesBlocked: false,
     hermesSuggestion: "Draft ready for your review — declines politely, keeps the door open.",
     messages: [
       {
@@ -145,12 +149,11 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(140),
         preview: "Would you be interested in advising our seed round?",
         body: "Would you be interested in advising our seed round? We're assembling a small group of operators and your name came up twice.",
-        sharedWithHermes: true, // shared so Hermes could draft the full-body decline
       },
     ],
     draft: {
       status: "generated",
-      bodyPolicy: "explicit_full_body",
+      bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c4d1",
       versions: [
@@ -171,6 +174,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(210),
+    threadShared: true,
+    hermesBlocked: false,
     hermesSuggestion: "Casual thanks reply drafted; low stakes, send when convenient.",
     messages: [
       {
@@ -180,12 +185,11 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(210),
         preview: "Thanks again for the recommendation!",
         body: "Thanks again for the recommendation! The call went really well and they moved me to the final round.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
       status: "edited",
-      bodyPolicy: "explicit_full_body",
+      bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c5d2",
       versions: [
@@ -213,6 +217,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(1500),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "You replied yesterday; waiting on their confirmation.",
     messages: [
       {
@@ -222,7 +228,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(1500),
         preview: "Sent — let me know if Tuesday still works on your end.",
         body: "Sent — let me know if Tuesday still works on your end.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -240,7 +245,9 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(2880),
-    hermesSuggestion: "Awaiting the doc they promised; consider a nudge in 2 days.",
+    threadShared: false,
+    hermesBlocked: false,
+    hermesSuggestion: "They owe you the one-pager — nothing for you to do until it lands.",
     messages: [
       {
         id: "c7m1",
@@ -249,7 +256,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(2880),
         preview: "Will send the one-pager over by end of week.",
         body: "Will send the one-pager over by end of week — thanks for your patience on this.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -267,6 +273,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(320),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "Informational; no reply expected.",
     messages: [
       {
@@ -276,7 +284,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(320),
         preview: "FYI the venue moved to the third floor.",
         body: "FYI the venue moved to the third floor — same building, just take the elevator past the lobby.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -294,6 +301,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(600),
+    threadShared: false,
+    hermesBlocked: false,
     hermesSuggestion: "Shared a link you might find useful; no action needed.",
     messages: [
       {
@@ -303,7 +312,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(600),
         preview: "Thought of you when I saw this piece on local-first sync.",
         body: "Thought of you when I saw this piece on local-first sync — the CRDT section especially.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
@@ -321,6 +329,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(4300),
+    threadShared: true,
+    hermesBlocked: false,
     hermesSuggestion: "Resolved — you confirmed the details.",
     messages: [
       {
@@ -330,12 +340,11 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(4300),
         preview: "Perfect, see you then.",
         body: "Perfect, see you then.",
-        sharedWithHermes: false,
       },
     ],
     draft: {
       status: "approved_intent",
-      bodyPolicy: "explicit_full_body",
+      bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c10d1",
       versions: [
@@ -356,27 +365,74 @@ const GEN_LAST = ["Kim", "Silva", "Novak", "Reyes", "Moss", "Idris", "Park", "Lu
 const GEN_SOURCES: SourceId[] = ["imessage", "linkedin", "x"];
 // Weighted so Needs Reply reads as the workhorse bucket.
 const GEN_BUCKETS: Bucket[] = ["needs", "needs", "drafted", "waiting", "needs", "fyi", "done", "needs", "waiting", "fyi"];
-const GEN_SNIPPETS = [
-  "Quick one — does the pricing page copy still say early access? Someone asked me today.",
-  "We're finalizing the panel lineup this week. Are you in if it's the 24th?",
-  "Sent over the contract redlines. Two small changes, nothing controversial.",
-  "Loved the write-up. One question about the sync engine — is it CRDT-based or op-log?",
-  "Can you resend the invite? It went to my old address.",
-  "The demo went great — they want a follow-up with their platform team next week.",
-  "No rush, but the venue needs a headcount by Friday.",
-  "Saw the launch — congrats! How's the first week looking?",
-  "I owe you an intro to that designer I mentioned. Still interested?",
-  "Heads up: the API version you're on sunsets at the end of the month.",
-  "Just landed back home. Let's catch up properly this week?",
-  "The doc you shared was exactly what we needed — thank you.",
-  "Are you around Thursday afternoon for a quick call about the roadmap?",
-  "Following up on my last note — any thoughts on the proposal?",
-  "New build is up. The keyboard nav feels dramatically better.",
-];
+
+// Bucket-coherent content (Elijah addendum, 2026-07-03): every snippet belongs
+// to exactly ONE bucket's semantics — a fixture must never plausibly straddle two.
+//   needs   = a direct question TO you (incoming; your court)
+//   waiting = YOUR last message asked for something (outgoing; their court)
+//   fyi     = pure broadcast info, no question, nothing owed either way
+//   done    = closed confirmation, nothing pending
+const GEN_BY_BUCKET: Record<
+  Bucket,
+  { snippets: string[]; direction: "in" | "out"; suggestion?: string }
+> = {
+  needs: {
+    direction: "in",
+    suggestion: "Open question in the last message; a short reply keeps it moving.",
+    snippets: [
+      "Quick one — does the pricing page copy still say early access? Someone asked me today.",
+      "We're finalizing the panel lineup this week. Are you in if it's the 24th?",
+      "Loved the write-up. One question about the sync engine — is it CRDT-based or op-log?",
+      "Can you resend the invite? It went to my old address.",
+      "Saw the launch — congrats! How's the first week looking?",
+      "Are you around Thursday afternoon for a quick call about the roadmap?",
+      "The venue needs a headcount by Friday — can you confirm yours?",
+    ],
+  },
+  drafted: {
+    direction: "in",
+    suggestion: "Draft ready for your review.",
+    snippets: [
+      "Following up on my last note — any thoughts on the proposal?",
+      "Sent over the contract redlines. Two small changes — OK to proceed?",
+      "I owe you an intro to that designer I mentioned. Still interested?",
+    ],
+  },
+  waiting: {
+    direction: "out", // your message closed the turn; the ball is in their court
+    suggestion: "You asked; nothing to do until they answer.",
+    snippets: [
+      "Sent the deck over — let me know which direction lands better.",
+      "Just shared the doc with you — flag anything that reads wrong.",
+      "Offer's in your inbox. Take your time, no rush on my end.",
+      "Pinged the venue about the 24th — will confirm as soon as they do.",
+    ],
+  },
+  fyi: {
+    direction: "in",
+    suggestion: "Informational; no reply expected.",
+    snippets: [
+      "Heads up: the API version you're on sunsets at the end of the month.",
+      "New build is up. The keyboard nav feels dramatically better.",
+      "FYI — moved our standup doc to the shared drive, same link structure.",
+      "The panel got moved to the main hall, same start time.",
+    ],
+  },
+  done: {
+    direction: "in",
+    suggestion: "Resolved — nothing left to do.",
+    snippets: [
+      "Perfect, that answers it — thanks!",
+      "All sorted on our end. Appreciate the quick turnaround.",
+      "Got it, see you there.",
+    ],
+  },
+};
 const GEN_DRAFT_TEXT =
   "Thanks for the nudge — I looked through it this morning and it's in good shape. Let me confirm one detail on my end and I'll get you a proper answer by tomorrow.";
 
 const GENERATED_PEOPLE: Record<string, Person> = {};
+const bucketCounters: Record<string, number> = {};
 const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
   const first = GEN_FIRST[i % GEN_FIRST.length];
   const last = GEN_LAST[(i * 7 + 3) % GEN_LAST.length];
@@ -388,38 +444,38 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
   GENERATED_PEOPLE[pid] = P(pid, name, handle);
 
   const bucket = GEN_BUCKETS[i % GEN_BUCKETS.length];
+  const spec = GEN_BY_BUCKET[bucket];
+  const nth = (bucketCounters[bucket] = (bucketCounters[bucket] ?? 0) + 1);
+  const body = spec.snippets[(nth - 1) % spec.snippets.length];
   const minAgo = 25 + i * 47 + (i % 5) * 13; // spread over ~28h, deterministic
-  const body = GEN_SNIPPETS[i % GEN_SNIPPETS.length];
   const drafted = bucket === "drafted";
-  const outgoing = bucket === "waiting" && i % 2 === 0;
+  const outgoing = spec.direction === "out";
 
   return {
     id: `cg${i}`,
     personId: pid,
     source,
     bucket,
-    urgency: i % 9 === 0 ? "high" : i % 4 === 0 ? "low" : "normal",
+    urgency: bucket === "needs" && i % 9 === 0 ? "high" : i % 4 === 0 ? "low" : "normal",
     unread: bucket === "needs" && i % 3 === 0,
     lastActivity: iso(minAgo),
-    hermesSuggestion:
-      bucket === "needs"
-        ? "Open question in the last message; a short reply keeps it moving."
-        : undefined,
+    threadShared: drafted, // generated drafts came from a thread share (default-on)
+    hermesBlocked: false,
+    hermesSuggestion: spec.suggestion,
     messages: [
       {
         id: `cg${i}m1`,
         authorId: outgoing ? "me" : pid,
-        direction: outgoing ? "out" : "in",
+        direction: spec.direction,
         timestamp: iso(minAgo),
         preview: body.length > 64 ? `${body.slice(0, 61)}…` : body,
         body,
-        sharedWithHermes: false,
       },
     ],
     draft: drafted
       ? {
           status: "generated" as const,
-          bodyPolicy: "metadata_only" as const,
+          bodyPolicy: "full_thread" as const,
           modelLocality: "mock" as const,
           activeVersionId: `cg${i}d1`,
           versions: [
@@ -449,8 +505,8 @@ export const AUDIT_EVENTS: AuditEvent[] = [
     timestamp: iso(119),
     actor: "human",
     surface: "ui",
-    action: "hermes.share",
-    resource: "c4m1",
+    action: "hermes.thread_share",
+    resource: "c4",
     result: "allowed",
   },
   {

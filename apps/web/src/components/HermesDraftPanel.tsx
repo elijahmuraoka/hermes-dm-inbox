@@ -5,15 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Check, RotateCw, Sparkles, Wand2, X } from "lucide-react";
 
-const LIFECYCLE: DraftStatus[] = [
-  "requested",
-  "generated",
-  "edited",
-  "approved_intent",
-];
+// Rail has four segments; angles_ready sits inside "requested" territory.
+const RANK: Record<DraftStatus, number> = {
+  not_started: -1,
+  requested: 0,
+  angles_ready: 0,
+  generated: 1,
+  edited: 2,
+  approved_intent: 3,
+};
 const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
   not_started: "Not started",
   requested: "Requested",
+  angles_ready: "Pick an angle",
   generated: "Generated",
   edited: "Edited",
   approved_intent: "Approved (intent)",
@@ -21,7 +25,13 @@ const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
 
 const POLICY_LABEL: Record<BodyPolicy, string> = {
   metadata_only: "Metadata only",
-  explicit_full_body: "Full body (explicit)",
+  full_thread: "Full thread",
+};
+
+const ANGLE_LABEL: Record<string, string> = {
+  warm: "Warm",
+  direct: "Direct",
+  brief: "Brief",
 };
 
 export function HermesDraftPanel({
@@ -33,6 +43,7 @@ export function HermesDraftPanel({
 }) {
   const drafting = useInboxStore((s) => s.drafting);
   const requestDraft = useInboxStore((s) => s.requestDraft);
+  const chooseAngle = useInboxStore((s) => s.chooseAngle);
   const regenerateDraft = useInboxStore((s) => s.regenerateDraft);
   const applyTone = useInboxStore((s) => s.applyTone);
   const approveDraft = useInboxStore((s) => s.approveDraft);
@@ -40,14 +51,13 @@ export function HermesDraftPanel({
 
   const draft = c.draft;
   const active = draft.versions.find((v) => v.id === draft.activeVersionId);
-  const hasDraft = draft.versions.length > 0;
+  const hasVersion = draft.versions.length > 0;
+  const anglesPending = draft.status === "angles_ready" && !!draft.angles;
   const approved = draft.status === "approved_intent";
 
-  // Body policy is derived LIVE from the thread's share state — it must never
-  // lag behind a share/unshare (it describes what Hermes sees right now).
-  const livePolicy: BodyPolicy = c.messages.some((m) => m.sharedWithHermes)
-    ? "explicit_full_body"
-    : "metadata_only";
+  // What Hermes sees for the NEXT draft, derived live from the thread state:
+  // full thread by default (that's the point of asking), metadata if blocked.
+  const livePolicy: BodyPolicy = c.hermesBlocked ? "metadata_only" : "full_thread";
 
   return (
     <aside
@@ -69,14 +79,13 @@ export function HermesDraftPanel({
         <span
           className="tnum ml-auto rounded-[5px] border px-1.5 py-px font-mono text-[10px]"
           style={{
-            color:
-              livePolicy === "explicit_full_body" ? "var(--priv-shared)" : "var(--muted-foreground)",
+            color: livePolicy === "full_thread" ? "var(--priv-shared)" : "var(--muted-foreground)",
             borderColor:
-              livePolicy === "explicit_full_body"
+              livePolicy === "full_thread"
                 ? "color-mix(in oklch, var(--priv-shared) 45%, transparent)"
                 : "var(--border)",
           }}
-          title={`Body policy right now: ${POLICY_LABEL[livePolicy]}`}
+          title={`Hermes drafts from: ${POLICY_LABEL[livePolicy]}`}
         >
           {POLICY_LABEL[livePolicy]}
         </span>
@@ -94,17 +103,12 @@ export function HermesDraftPanel({
 
       {/* lifecycle rail */}
       <div className="flex items-center gap-1 border-b border-border px-3.5 py-2.5">
-        {LIFECYCLE.map((step, i) => {
-          const reached =
-            draft.status !== "not_started" &&
-            LIFECYCLE.indexOf(draft.status as DraftStatus) >= i;
+        {[0, 1, 2, 3].map((i) => {
+          const reached = RANK[draft.status] >= i;
           return (
-            <div key={step} className="flex flex-1 items-center gap-1">
+            <div key={i} className="flex flex-1 items-center gap-1">
               <span
-                className={cn(
-                  "flex-1 rounded-full",
-                  reached ? "h-[3px]" : "h-[2px]",
-                )}
+                className={cn("flex-1 rounded-full", reached ? "h-[3px]" : "h-[2px]")}
                 style={{
                   background: reached ? "var(--primary)" : "var(--border)",
                   boxShadow: reached ? "0 0 6px var(--glow-primary)" : undefined,
@@ -120,14 +124,18 @@ export function HermesDraftPanel({
 
       {/* body */}
       <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3">
-        {!hasDraft && !drafting && (
+        {!hasVersion && !anglesPending && !drafting && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="max-w-[220px] text-[12.5px] text-muted-foreground">
-              Ask Hermes to draft a reply in your voice. Hermes drafts from metadata only — it sees
-              full message bodies only when you explicitly share them.
+            <p className="max-w-[230px] text-[12.5px] text-muted-foreground">
+              {c.hermesBlocked
+                ? "Hermes is blocked on this thread — drafts will use metadata only."
+                : "Asking for a draft shares this thread with Hermes — that's the point. You can block it per thread."}
             </p>
             <Button variant="primary" size="sm" onClick={() => requestDraft()} disabled={drafting}>
-              <Wand2 /> Draft reply <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">d</Kbd>
+              <Wand2 /> Draft reply{" "}
+              <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
+                d
+              </Kbd>
             </Button>
           </div>
         )}
@@ -143,18 +151,43 @@ export function HermesDraftPanel({
           </div>
         )}
 
-        {hasDraft && !drafting && active && (
+        {/* three angled candidates — pick with 1 / 2 / 3 */}
+        {anglesPending && !drafting && (
+          <div className="animate-stream space-y-2">
+            <p className="text-[11px] text-muted-foreground">
+              Three angles — pick one with <Kbd>1</Kbd> <Kbd>2</Kbd> <Kbd>3</Kbd> or click:
+            </p>
+            {draft.angles!.map((a, i) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => chooseAngle((i + 1) as 1 | 2 | 3)}
+                className={cn(
+                  "flex w-full items-start gap-2.5 rounded-lg border border-border bg-background/60 p-2.5 text-left",
+                  "transition-colors hover:border-primary/40 hover:bg-accent/40",
+                )}
+              >
+                <Kbd className="mt-0.5">{i + 1}</Kbd>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {ANGLE_LABEL[a.tone]}
+                  </span>
+                  <span className="text-[12.5px] leading-relaxed text-foreground">{a.text}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {hasVersion && !drafting && !anglesPending && active && (
           <div className="animate-stream space-y-3">
-            <div
-              className="rounded-lg border border-border bg-background/60 p-3 text-[13px] leading-relaxed text-foreground"
-            >
+            <div className="rounded-lg border border-border bg-background/60 p-3 text-[13px] leading-relaxed text-foreground">
               {active.text}
             </div>
 
             <div className="space-y-1 text-[11px] text-muted-foreground">
               <p>
-                <span className="text-muted-foreground">Instructions:</span>{" "}
-                {active.instructions}
+                <span className="text-muted-foreground">Instructions:</span> {active.instructions}
               </p>
               {active.reason && (
                 <p>
@@ -229,7 +262,16 @@ export function HermesDraftPanel({
                   onClick={approveDraft}
                   disabled={drafting || approved}
                 >
-                  <Check /> {approved ? "Approved" : "Approve"} <Kbd className={cn("ml-0.5", !approved && "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground")}>a</Kbd>
+                  <Check /> {approved ? "Approved" : "Approve"}{" "}
+                  <Kbd
+                    className={cn(
+                      "ml-0.5",
+                      !approved &&
+                        "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground",
+                    )}
+                  >
+                    a
+                  </Kbd>
                 </Button>
               </div>
               <p className="text-[10.5px] leading-snug text-muted-foreground">

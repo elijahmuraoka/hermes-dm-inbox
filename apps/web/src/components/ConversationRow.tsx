@@ -3,6 +3,7 @@ import type { Conversation } from "@/lib/types";
 import { SOURCE_META } from "@/lib/types";
 import { PEOPLE } from "@/lib/mock-data";
 import { cn, relTime } from "@/lib/utils";
+import { SourceIcon } from "@/components/SourceIcon";
 
 interface RowProps {
   conversation: Conversation;
@@ -14,12 +15,12 @@ interface RowProps {
 // LOCKED (§8 variant bake-off, Elijah 2026-07-03): the "ledger" treatment.
 // Single-line 40px max density. The edge language is the identity move:
 //   cyan  = where you are  (selection: full-row primary wash + inset ring)
-//   amber = what Hermes sees (shared: glowing amber tick on the row edge)
+//   amber = what Hermes sees (thread shared: glowing amber tick on the row edge)
 // Losing variants ("edge", "card") deleted from the codebase.
 function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowProps) {
   const person = PEOPLE[c.personId];
   const lastMsg = c.messages[c.messages.length - 1];
-  const shared = c.messages.some((m) => m.sharedWithHermes);
+  const shared = c.threadShared;
   const drafted = c.draft.status !== "not_started";
 
   return (
@@ -50,8 +51,11 @@ function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowPro
         )}
       </span>
 
-      <span className="w-8 shrink-0 text-center font-mono text-[9.5px] uppercase text-muted-foreground">
-        {SOURCE_META[c.source].glyph}
+      <span
+        className="flex w-8 shrink-0 justify-center text-muted-foreground"
+        title={SOURCE_META[c.source].label}
+      >
+        <SourceIcon source={c.source} className="size-3.5" />
       </span>
 
       <span

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Bucket, Conversation, SourceId } from "@/lib/types";
+import type { Bucket, Conversation, DraftAngle, DraftAngleTone, SourceId } from "@/lib/types";
 import { AUDIT_EVENTS, CONVERSATIONS, MOCK_NOW } from "@/lib/mock-data";
 import type { AuditEvent } from "@/lib/types";
 
@@ -27,7 +27,8 @@ interface InboxState {
   sourceFilter: SourceId | "all";
   selectedId: string | null;
   mobilePane: "list" | "thread"; // active pane below the lg breakpoint
-  draftSheetOpen: boolean; // bottom-sheet draft panel below lg — the hero loop must be visible everywhere
+  draftSheetOpen: boolean; // bottom-sheet draft panel below xl — the hero loop must be visible everywhere
+  drawerOpen: boolean; // mobile (<md) hamburger drawer holding the bucket/source rail
   paletteOpen: boolean;
   shortcutsOpen: boolean;
   drafting: boolean;
@@ -47,20 +48,19 @@ interface InboxState {
   setPalette: (open: boolean) => void;
   setShortcuts: (open: boolean) => void;
   setDraftSheet: (open: boolean) => void;
+  setDrawer: (open: boolean) => void;
 
   // triage
   markDone: (id?: string) => void;
   snooze: (id?: string) => void;
   togglePriority: (id?: string) => void;
 
-  // privacy — the ONE gate: sharing a body into Hermes' context
-  shareWithHermes: (messageId: string) => void;
-  unshareFromHermes: (messageId: string) => void;
-  shareNext: () => void; // ⇧V: share the next unshared incoming body in the selected thread
-  unshareLast: () => void; // z: undo — unshare the most recent shared body
+  // privacy — thread-level gate: drafting shares the thread unless blocked
+  toggleHermesAccess: () => void; // per-thread opt-out: block/allow Hermes body access
 
   // hermes draft
-  requestDraft: (instructions?: string) => void;
+  requestDraft: () => void; // → 3 angled candidates (angles_ready)
+  chooseAngle: (n: 1 | 2 | 3) => void; // number-key pick → generated
   regenerateDraft: (reason: string) => void;
   applyTone: (toneId: string) => void;
   approveDraft: () => void;
@@ -93,6 +93,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   selectedId: null,
   mobilePane: "list",
   draftSheetOpen: false,
+  drawerOpen: false,
   paletteOpen: false,
   shortcutsOpen: false,
   drafting: false,
@@ -111,13 +112,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 
   setBucket: (b) => {
-    set({ activeBucket: b, mobilePane: "list", draftSheetOpen: false }); // list-level action
+    set({ activeBucket: b, mobilePane: "list", draftSheetOpen: false, drawerOpen: false }); // list-level action
     const first = get().visibleConversations()[0] ?? null;
     set({ selectedId: first?.id ?? null });
   },
 
   setSourceFilter: (s) => {
-    set({ sourceFilter: s, mobilePane: "list" }); // filtering is a list-level action
+    set({ sourceFilter: s, mobilePane: "list", drawerOpen: false }); // list-level action
     const first = get().visibleConversations()[0] ?? null;
     set({ selectedId: first?.id ?? null });
   },
@@ -145,6 +146,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   backToList: () => set({ mobilePane: "list", draftSheetOpen: false }),
   setPalette: (open) => set({ paletteOpen: open }),
   setDraftSheet: (open) => set({ draftSheetOpen: open }),
+  setDrawer: (open) => set({ drawerOpen: open }),
   setShortcuts: (open) => set({ shortcutsOpen: open }),
 
   markDone: (id) => {
@@ -188,105 +190,135 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
   },
 
-  shareWithHermes: (messageId) => {
-    set((s) => ({
-      conversations: s.conversations.map((c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === messageId ? { ...m, sharedWithHermes: true } : m,
-        ),
-      })),
-      audit: pushAudit(
-        s.audit,
-        { actor: "human", surface: "ui", action: "hermes.share", resource: messageId, result: "allowed" },
-        s.now,
-      ),
-    }));
-  },
-
-  unshareFromHermes: (messageId) => {
-    set((s) => ({
-      conversations: s.conversations.map((c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === messageId ? { ...m, sharedWithHermes: false } : m,
-        ),
-      })),
-      audit: pushAudit(
-        s.audit,
-        { actor: "human", surface: "ui", action: "hermes.unshare", resource: messageId, result: "allowed" },
-        s.now,
-      ),
-    }));
-  },
-
-  shareNext: () => {
-    const m = get()
-      .selected()
-      ?.messages.find((x) => x.direction === "in" && !x.sharedWithHermes);
-    if (m) get().shareWithHermes(m.id);
-  },
-
-  // Undo for the sharing gate: unshare the most recent shared incoming body.
-  unshareLast: () => {
-    const shared = get()
-      .selected()
-      ?.messages.filter((x) => x.direction === "in" && x.sharedWithHermes);
-    const last = shared?.[shared.length - 1];
-    if (last) get().unshareFromHermes(last.id);
-  },
-
-  requestDraft: (instructions) => {
+  // Per-thread opt-out toggle. Blocking does not un-happen a past share
+  // (threadShared stays true as historical fact); it stops future drafts
+  // from reading bodies. Both directions are audited.
+  toggleHermesAccess: () => {
     const conv = get().selected();
     if (!conv) return;
-    const instr = instructions ?? "Draft a reply in my voice.";
-    // lifecycle: requested -> (mock latency) -> generated
-    // Open the sheet too: below lg the side panel doesn't exist, and a state
-    // mutation with no visible feedback is a contract violation.
+    const blocking = !conv.hermesBlocked;
     set((s) => ({
-      drafting: true,
-      draftSheetOpen: true,
       conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
+        c.id === conv.id ? { ...c, hermesBlocked: blocking } : c,
       ),
       audit: pushAudit(
+        s.audit,
+        {
+          actor: "human",
+          surface: "ui",
+          action: blocking ? "hermes.thread_block" : "hermes.thread_allow",
+          resource: conv.id,
+          result: "allowed",
+        },
+        s.now,
+      ),
+    }));
+  },
+
+  requestDraft: () => {
+    const conv = get().selected();
+    if (!conv) return;
+    // Thread-level default-on sharing (Elijah, 2026-07-03 v2): asking for a
+    // draft IS the share — Hermes reads the full thread unless this thread is
+    // blocked. The share is audited once, when it first happens.
+    const sharesNow = !conv.hermesBlocked && !conv.threadShared;
+    // lifecycle: requested -> (mock latency) -> angles_ready -> pick 1/2/3
+    // Open the sheet too: below xl the side panel doesn't exist, and a state
+    // mutation with no visible feedback is a contract violation.
+    set((s) => {
+      let audit = pushAudit(
         s.audit,
         { actor: "hermes", surface: "ui", action: "draft.request", resource: conv.id, result: "allowed" },
         s.now,
-      ),
-    }));
+      );
+      if (sharesNow) {
+        audit = pushAudit(
+          audit,
+          { actor: "human", surface: "ui", action: "hermes.thread_share", resource: conv.id, result: "allowed" },
+          s.now,
+        );
+      }
+      return {
+        drafting: true,
+        draftSheetOpen: true,
+        conversations: s.conversations.map((c) =>
+          c.id === conv.id
+            ? {
+                ...c,
+                threadShared: c.threadShared || !c.hermesBlocked,
+                draft: { ...c.draft, status: "requested" },
+              }
+            : c,
+        ),
+        audit,
+      };
+    });
 
     window.setTimeout(() => {
       set((s) => ({
         drafting: false,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
-          const vid = `${c.id}d${c.draft.versions.length + 1}`;
-          const text = MOCK_DRAFTS[c.id] ?? MOCK_DRAFT_FALLBACK;
-          // Default: draft from metadata. Full bodies only if the human shared them.
-          const usedFullBody = c.messages.some((m) => m.sharedWithHermes);
+          const set = anglesFor(c.id);
+          // Three angled candidates: 1 warm · 2 direct · 3 brief (pick by number key).
+          const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
+            (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: set[tone] }),
+          );
           return {
             ...c,
-            bucket: c.bucket === "needs" ? "drafted" : c.bucket,
             draft: {
               ...c.draft,
-              bodyPolicy: usedFullBody ? "explicit_full_body" : "metadata_only",
-              status: "generated",
-              versions: [
-                ...c.draft.versions,
-                { id: vid, createdAt: new Date(s.now).toISOString(), instructions: instr, text },
-              ],
-              activeVersionId: vid,
+              bodyPolicy: c.hermesBlocked ? "metadata_only" : "full_thread",
+              status: "angles_ready",
+              angles,
             },
           };
         }),
         audit: pushAudit(
           s.audit,
-          { actor: "hermes", surface: "ui", action: "draft.generate", resource: conv.id, result: "allowed" },
+          { actor: "hermes", surface: "ui", action: "draft.angles", resource: conv.id, result: "allowed" },
           s.now,
         ),
       }));
     }, 620);
+  },
+
+  chooseAngle: (n) => {
+    const conv = get().selected();
+    if (!conv || conv.draft.status !== "angles_ready" || !conv.draft.angles) return;
+    const angle = conv.draft.angles[n - 1];
+    if (!angle) return;
+    set((s) => ({
+      draftSheetOpen: true,
+      conversations: s.conversations.map((c) => {
+        if (c.id !== conv.id) return c;
+        const vid = `${c.id}d${c.draft.versions.length + 1}`;
+        return {
+          ...c,
+          bucket: c.bucket === "needs" ? "drafted" : c.bucket,
+          draft: {
+            ...c.draft,
+            status: "generated",
+            angles: undefined,
+            versions: [
+              ...c.draft.versions,
+              {
+                id: vid,
+                createdAt: new Date(s.now).toISOString(),
+                instructions: `Angle: ${angle.tone}`,
+                text: angle.text,
+              },
+            ],
+            activeVersionId: vid,
+          },
+        };
+      }),
+      audit: pushAudit(
+        s.audit,
+        { actor: "human", surface: "ui", action: `draft.angle_pick.${angle.tone}`, resource: conv.id, result: "allowed" },
+        s.now,
+      ),
+    }));
   },
 
   regenerateDraft: (reason) => {
@@ -367,13 +399,43 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 }));
 
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────
-const MOCK_DRAFTS: Record<string, string> = {
-  c1: "Yep — went through the deck last night, it's in good shape. One note on the pricing slide I'll flag inline. And 3pm works great, let's do that.",
-  c2: "Thanks so much — really glad it landed. Happy to be introduced; feel free to connect us over email and I'll take it from there.",
-  c3: "Good catch — it isn't documented yet. A PR would be genuinely welcome; I'll make sure it gets reviewed quickly. Want me to point you at the signing helper?",
+// Each fixture gets three GENUINELY distinct drafts, not one text re-dressed:
+//   WARM   = relational open + soft commit
+//   DIRECT = answer first, one line, no cushioning
+//   BRIEF  = the shortest honest reply
+type AngleSet = Record<DraftAngleTone, string>;
+
+const MOCK_ANGLE_SETS: Record<string, AngleSet> = {
+  // Dana: reviewed the deck? + move call to 3pm
+  c1: {
+    warm: "Dana! Yes — went through the deck last night and it's honestly in great shape. I'll send one small note on the pricing slide inline. And of course, 3pm is no problem at all — see you then.",
+    direct: "Deck's reviewed — send it after one fix on the pricing slide, note incoming. 3pm works.",
+    brief: "Deck looks good — one note coming. 3pm works.",
+  },
+  // Priya: warm intro request
+  c2: {
+    warm: "Thank you — that talk was a joy to give and I'm really glad it landed. I'd be happy to meet your head of platform; connect us over email whenever suits and I'll pick it up from there.",
+    direct: "Yes — happy to take the intro. Connect us over email and I'll take it from there.",
+    brief: "Sure — intro over email works.",
+  },
+  // Marco: webhook signing docs
+  c3: {
+    warm: "Great timing — you're right, it isn't documented yet, and I'd genuinely welcome the help. If you're up for the PR I'll make sure it gets a fast review, and I can point you at the signing helper to start from.",
+    direct: "Not documented yet. A PR would be welcome — I'll review it fast. Start from the signing helper.",
+    brief: "Not yet — a PR would be very welcome.",
+  },
 };
-const MOCK_DRAFT_FALLBACK =
-  "Thanks for this — give me a day to think it through and I'll come back with a proper reply.";
+
+// Generic trio for generated fixtures — still three different replies.
+const ANGLE_FALLBACK: AngleSet = {
+  warm: "Really glad you flagged this — thank you. Let me give it proper thought today and come back tomorrow with a real answer instead of a rushed one.",
+  direct: "Got it. I'll confirm one detail and have an answer for you tomorrow.",
+  brief: "On it — answer by tomorrow.",
+};
+
+function anglesFor(conversationId: string): AngleSet {
+  return MOCK_ANGLE_SETS[conversationId] ?? ANGLE_FALLBACK;
+}
 
 function regenerate(text: string, reason: string): string {
   const r = reason.toLowerCase();
