@@ -4,7 +4,8 @@ import { PEOPLE } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { cn, relTime } from "@/lib/utils";
 import { SourceIcon } from "@/components/SourceIcon";
-import { ChevronLeft, Share2, ShieldOff, Wand2 } from "lucide-react";
+import { ChevronLeft, Share2, ShieldOff } from "lucide-react";
+import { HermesMark } from "@/components/HermesMark";
 
 export function Thread({ conversation: c }: { conversation: Conversation }) {
   const person = PEOPLE[c.personId];
@@ -59,7 +60,7 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
           onClick={() => setDraftSheet(true)}
           className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-primary/20 sm:ml-2 xl:hidden"
         >
-          <Wand2 className="size-3.5 text-primary" strokeWidth={2.25} />
+          <HermesMark className="size-3.5 text-primary" strokeWidth={2.2} />
           {hasDraft ? "View draft" : "Draft"}
         </button>
       </div>

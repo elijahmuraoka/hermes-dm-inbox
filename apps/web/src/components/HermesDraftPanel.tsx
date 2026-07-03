@@ -3,7 +3,8 @@ import { useInboxStore, TONE_CONTROLS } from "@/hooks/useInboxStore";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Check, RotateCw, Sparkles, Wand2, X } from "lucide-react";
+import { Check, RotateCw, X } from "lucide-react";
+import { HermesMark } from "@/components/HermesMark";
 
 // Rail has four segments; angles_ready sits inside "requested" territory.
 const RANK: Record<DraftStatus, number> = {
@@ -73,7 +74,7 @@ export function HermesDraftPanel({
           className="flex size-5 items-center justify-center rounded-md text-primary"
           style={{ background: "color-mix(in oklch, var(--primary) 14%, transparent)" }}
         >
-          <Sparkles className="size-3" strokeWidth={2.5} />
+          <HermesMark className="size-3.5" strokeWidth={2.4} />
         </span>
         <span className="text-[12.5px] font-semibold tracking-[-0.01em]">Hermes draft</span>
         <span
@@ -132,7 +133,7 @@ export function HermesDraftPanel({
                 : "Asking for a draft shares this thread with Hermes — that's the point. You can block it per thread."}
             </p>
             <Button variant="primary" size="sm" onClick={() => requestDraft()} disabled={drafting}>
-              <Wand2 /> Draft reply{" "}
+              <HermesMark className="size-3.5" strokeWidth={2.2} /> Draft reply{" "}
               <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
                 d
               </Kbd>

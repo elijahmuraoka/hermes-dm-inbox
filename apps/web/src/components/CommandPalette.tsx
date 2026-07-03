@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { BUCKET_META, SOURCE_META, type Bucket, type SourceId } from "@/lib/types";
 import { Kbd } from "@/components/ui/kbd";
+import { HermesMark } from "@/components/HermesMark";
 import {
   ArrowRight,
   Check,
@@ -11,7 +12,6 @@ import {
   RefreshCw,
   Search,
   Share2,
-  Wand2,
 } from "lucide-react";
 
 type Scope = "global" | "selected" | "thread" | "source";
@@ -116,7 +116,7 @@ export function CommandPalette() {
         group: "Draft",
         scope: "thread",
         keys: "d",
-        icon: Wand2,
+        icon: HermesMark,
         run: withClose(() => requestDraft()),
         disabled: !selected,
       },
