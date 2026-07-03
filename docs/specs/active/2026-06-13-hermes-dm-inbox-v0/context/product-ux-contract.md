@@ -168,8 +168,8 @@ not_started
 → generated            (picked; read-only card, "Add to chat" is the primary action)
 → added_to_chat        (prefilled into the composer)
 → edited               (composer text diverged from the Hermes draft)
-→ sent_mock            (sent from the composer — v0 = LOCAL MOCK, no real delivery;
-                        audited as draft.sent_mock, the intent record)
+→ sent_mock            (sent from the composer — v0 = LOCAL MOCK, no real delivery,
+                        presented in the UI as a real send; audited as draft.sent_mock)
 → future: real send path (send_queued / sent) replaces the mock
 ```
 
@@ -182,7 +182,9 @@ Draft panel requirements:
 - supports tone/length controls
 - stores versions
 - sending a Hermes-originated draft from the composer records the intent (audit `draft.sent_mock`);
-  v0 "send" is a local mock append, honestly labeled — no real delivery exists
+  v0 "send" is a local mock append — no real delivery exists. Per the diegetic-prototype guardrail
+  (DESIGN.md §7, Elijah 2026-07-03) the UI presents it as a real send: implementation honesty lives in
+  code/commits/PR, never rendered on the surface
 
 Draft controls:
 
