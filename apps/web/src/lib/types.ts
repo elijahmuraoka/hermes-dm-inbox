@@ -51,6 +51,7 @@ export interface DraftVersion {
   createdAt: string;
   instructions: string;
   text: string;
+  from: BodyPolicy; // provenance: what Hermes actually saw when THIS text was made
   reason?: string; // regeneration reason
 }
 
@@ -59,6 +60,7 @@ export interface Draft {
   bodyPolicy: BodyPolicy;
   modelLocality: "mock" | "local" | "cloud";
   angles?: DraftAngle[]; // present while status === "angles_ready"
+  anglesFrom?: BodyPolicy; // provenance of the pending candidates
   versions: DraftVersion[];
   activeVersionId?: string;
 }
@@ -127,8 +129,8 @@ export const BUCKET_META: Record<
   },
 };
 
-export const SOURCE_META: Record<SourceId, { label: string; glyph: string }> = {
-  imessage: { label: "iMessage", glyph: "iMsg" },
-  linkedin: { label: "LinkedIn", glyph: "in" },
-  x: { label: "X", glyph: "X" },
+export const SOURCE_META: Record<SourceId, { label: string }> = {
+  imessage: { label: "iMessage" },
+  linkedin: { label: "LinkedIn" },
+  x: { label: "X" },
 };

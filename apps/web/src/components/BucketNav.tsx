@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Kbd } from "@/components/ui/kbd";
 import { SourceIcon } from "@/components/SourceIcon";
-import { Layers, Zap } from "lucide-react";
+import { HermesMark } from "@/components/HermesMark";
+import { Layers } from "lucide-react";
 
 const ORDER: Bucket[] = ["needs", "drafted", "waiting", "fyi", "done"];
 
@@ -31,7 +32,7 @@ export function BucketNav() {
           className="flex size-6 items-center justify-center rounded-md text-primary"
           style={{ background: "color-mix(in oklch, var(--primary) 14%, transparent)" }}
         >
-          <Zap className="size-3.5" strokeWidth={2.5} />
+          <HermesMark className="size-4" strokeWidth={2.2} />
         </div>
         <span className="text-[12.5px] font-semibold tracking-[-0.01em]">Hermes Inbox</span>
       </div>

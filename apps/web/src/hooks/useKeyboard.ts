@@ -25,12 +25,12 @@ export function useKeyboard() {
     const onKey = (e: KeyboardEvent) => {
       const st = s();
 
-      // Esc closes any modal regardless of focus.
+      // Esc closes the TOPMOST overlay only — one press, one layer.
       if (e.key === "Escape") {
         if (st.paletteOpen) st.setPalette(false);
-        if (st.shortcutsOpen) st.setShortcuts(false);
-        if (st.draftSheetOpen) st.setDraftSheet(false);
-        if (st.drawerOpen) st.setDrawer(false);
+        else if (st.shortcutsOpen) st.setShortcuts(false);
+        else if (st.drawerOpen) st.setDrawer(false);
+        else if (st.draftSheetOpen) st.setDraftSheet(false);
         return;
       }
       if (st.paletteOpen) return; // palette owns keys while open

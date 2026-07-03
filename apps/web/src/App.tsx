@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { BucketNav } from "@/components/BucketNav";
@@ -83,22 +83,7 @@ export default function App() {
       </div>
 
       {/* Mobile drawer (<md): hamburger → the same bucket/source rail. */}
-      {drawerOpen && (
-        <div
-          className="fixed inset-0 z-40 flex bg-black/45 backdrop-blur-sm md:hidden"
-          onClick={() => setDrawer(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Buckets and sources"
-            className="animate-drawer-in h-full shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <BucketNav />
-          </div>
-        </div>
-      )}
+      {drawerOpen && <MobileDrawer onClose={() => setDrawer(false)} />}
 
       {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
           thread's Draft button, or any draft request. Never a silent mutation. */}
@@ -124,6 +109,62 @@ export default function App() {
 
       <CommandPalette />
       <ShortcutSheet />
+    </div>
+  );
+}
+
+/** aria-modal must mean it: focus moves in on open, Tab is trapped, focus
+    restores to the opener on close. */
+function MobileDrawer({ onClose }: { onClose: () => void }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusables = () =>
+      Array.from(
+        panel?.querySelectorAll<HTMLElement>(
+          'button, [href], input, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    focusables()[0]?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const els = focusables();
+      if (!els.length) return;
+      const first = els[0];
+      const last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    panel?.addEventListener("keydown", onKey);
+    return () => {
+      panel?.removeEventListener("keydown", onKey);
+      opener?.focus();
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex bg-black/45 backdrop-blur-sm md:hidden"
+      onClick={onClose}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Buckets and sources"
+        className="animate-drawer-in h-full shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <BucketNav />
+      </div>
     </div>
   );
 }

@@ -36,12 +36,21 @@ function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowPro
           : "hover:bg-accent/25",
       )}
     >
-      {/* shared = amber tick on the row edge — the one original signal, made loud */}
+      {/* shared = amber tick on the row edge — the one original signal, made loud.
+          Blocked-after-share: muted tick, no glow — the history stands, the door is shut. */}
       {shared && (
         <span
           className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
-          style={{ background: "var(--priv-shared)", boxShadow: "0 0 8px var(--priv-shared)" }}
-          title="A body in this thread is shared with Hermes"
+          style={
+            c.hermesBlocked
+              ? { background: "var(--muted-foreground)", opacity: 0.55 }
+              : { background: "var(--priv-shared)", boxShadow: "0 0 8px var(--priv-shared)" }
+          }
+          title={
+            c.hermesBlocked
+              ? "This thread was shared with Hermes; Hermes is now blocked here"
+              : "This thread is shared with Hermes"
+          }
         />
       )}
 

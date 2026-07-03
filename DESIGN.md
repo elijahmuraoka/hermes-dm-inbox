@@ -157,7 +157,9 @@ Each ships with **all states** — default · hover · focus-visible · selected
    **Block/Allow** opt-out toggle, nothing when unshared.
 4. **HermesDraftPanel** — lifecycle (`requested→angles_ready→generated→edited→approved_intent`); on `d`
    Hermes returns **three angled candidates (1 warm · 2 direct · 3 brief)** picked by number key; live
-   **body-policy pill** (Full thread by default / Metadata only when blocked); tone controls,
+   **body-policy pill describes only the NEXT draft**, while candidates and versions carry their own
+   **"Drafted from:" provenance** (what Hermes actually saw when that text was made). Blocking a thread
+   **cancels any in-flight generation** — nothing may arrive under a revoked policy. Tone controls,
    regenerate-with-reason, version list, approve-intent. Side rail at `xl+`, bottom sheet below.
 5. **CommandPalette (⌘K)** — categorized (Navigate/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.

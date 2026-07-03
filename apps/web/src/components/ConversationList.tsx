@@ -29,8 +29,9 @@ export function ConversationList() {
       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-b border-border px-4 py-1.5">
         <h2 className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[-0.01em]">
           {BUCKET_META[activeBucket].label}
+          {/* An errored sync can't vouch for a count — show unknown, not stale. */}
           <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[10.5px] tabular-nums text-muted-foreground">
-            {list.length}
+            {loadState === "error" ? "—" : list.length}
           </span>
         </h2>
         {/* One-line semantics so the bucket model is self-evident (Elijah addendum). */}

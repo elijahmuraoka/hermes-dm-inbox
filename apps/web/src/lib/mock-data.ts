@@ -2,7 +2,16 @@
 // handles, or message content. Fixed clock so relative times are deterministic.
 // Volume matters: the §4 density rhythm only reads with a realistically full
 // inbox, so hand-written conversations are extended by a deterministic generator.
-import type { AuditEvent, Bucket, Conversation, Person, SourceId } from "./types";
+import type {
+  AuditEvent,
+  Bucket,
+  Conversation,
+  DraftAngleTone,
+  Person,
+  SourceId,
+} from "./types";
+
+export type AngleSet = Record<DraftAngleTone, string>;
 
 export const MOCK_NOW = new Date("2026-07-03T17:00:00Z").getTime();
 
@@ -160,6 +169,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
         {
           id: "c4d1",
           createdAt: iso(120),
+          from: "full_thread",
           instructions: "Decline for now, warm, leave the door open for later.",
           text: "Really appreciate you thinking of me, Wei — and congrats on getting the round moving. I'm heads-down on a build right now so I can't take on an advising role this quarter, but I'd love to stay in touch and reconnect once you're past the raise. Keep me posted on how it comes together.",
         },
@@ -196,12 +206,14 @@ const BASE_CONVERSATIONS: Conversation[] = [
         {
           id: "c5d1",
           createdAt: iso(200),
+          from: "full_thread",
           instructions: "Warm, brief congratulations.",
           text: "That's fantastic news — not surprised at all. Go get the final round!",
         },
         {
           id: "c5d2",
           createdAt: iso(196),
+          from: "full_thread",
           instructions: "Warm, brief congratulations.",
           reason: "Make it a touch more personal.",
           text: "That's fantastic — genuinely not surprised, you were the obvious pick. Go take the final round. Rooting for you.",
@@ -351,6 +363,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
         {
           id: "c10d1",
           createdAt: iso(4320),
+          from: "full_thread",
           instructions: "Confirm and close out warmly.",
           text: "Perfect, see you then.",
         },
@@ -372,6 +385,111 @@ const GEN_BUCKETS: Bucket[] = ["needs", "needs", "drafted", "waiting", "needs", 
 //   waiting = YOUR last message asked for something (outgoing; their court)
 //   fyi     = pure broadcast info, no question, nothing owed either way
 //   done    = closed confirmation, nothing pending
+// Needs-bucket snippets carry their own THREAD-AWARE angle trios (warm =
+// relational open + soft commit · direct = answer first · brief = shortest
+// honest reply) — drafting mostly happens here, and thread-blind fallback
+// angles read as broken. Keyed by body text at draft time.
+const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
+  {
+    body: "Quick one — does the pricing page copy still say early access? Someone asked me today.",
+    angles: {
+      warm: "Good catch — and thanks for flagging it. Checking the live copy right now; I'll confirm within the hour.",
+      direct: "Yes, it still says early access — updating it today.",
+      brief: "Still says early access — fixing now.",
+    },
+  },
+  {
+    body: "We're finalizing the panel lineup this week. Are you in if it's the 24th?",
+    angles: {
+      warm: "Honored to be asked — the 24th works on my end. Count me in, and send over whatever prep you need.",
+      direct: "Yes to the 24th. Send the format and my slot.",
+      brief: "In for the 24th.",
+    },
+  },
+  {
+    body: "Loved the write-up. One question about the sync engine — is it CRDT-based or op-log?",
+    angles: {
+      warm: "Thank you — really glad it landed. It's op-log under the hood; happy to walk through why we passed on CRDTs if that's useful.",
+      direct: "Op-log, not CRDT — deterministic replay mattered more than concurrent merge.",
+      brief: "Op-log — happy to elaborate.",
+    },
+  },
+  {
+    body: "Can you resend the invite? It went to my old address.",
+    angles: {
+      warm: "Of course — just resent it to this address. Shout if it doesn't land in a few minutes.",
+      direct: "Resent to this address just now.",
+      brief: "Done — check your inbox.",
+    },
+  },
+  {
+    body: "Saw the launch — congrats! How's the first week looking?",
+    angles: {
+      warm: "Thank you! Week one has been wild in the best way — signups ahead of plan. Let's catch up properly soon.",
+      direct: "Strong — ahead of plan on signups. Retention read comes next week.",
+      brief: "Great so far — ahead of plan.",
+    },
+  },
+  {
+    body: "Are you around Thursday afternoon for a quick call about the roadmap?",
+    angles: {
+      warm: "Thursday afternoon works — anytime after 2. Looking forward to it.",
+      direct: "Yes — Thursday after 2pm. Send an invite.",
+      brief: "Yes, after 2pm Thursday.",
+    },
+  },
+  {
+    body: "The venue needs a headcount by Friday — can you confirm yours?",
+    angles: {
+      warm: "Thanks for staying on top of this — I'll be there, plus one. Confirming now so you're set well before Friday.",
+      direct: "Confirmed: two from my side.",
+      brief: "Confirmed — two.",
+    },
+  },
+  {
+    body: "Did the contract come back from legal yet? We'd like to sign this week.",
+    angles: {
+      warm: "Appreciate the patience on this — legal returned it this morning with two minor notes. Clean version to you tomorrow so you can sign this week.",
+      direct: "Back from legal today, two minor notes. Clean copy tomorrow — signing this week works.",
+      brief: "Back today — clean copy tomorrow.",
+    },
+  },
+  {
+    body: "What's the best way to cite your local-first talk in our internal doc?",
+    angles: {
+      warm: "That's kind of you to ask — a link to the recording plus the talk title and my name is perfect. Glad it's useful internally!",
+      direct: "Link the recording + title + my name. No other permission needed.",
+      brief: "Recording link + title is perfect.",
+    },
+  },
+  {
+    body: "We hit the rate limit on the staging key — can you bump it?",
+    angles: {
+      warm: "Sorry you hit that wall — bumping the staging key's limit now. Give it ten minutes and you should be clear.",
+      direct: "Bumped to 10x — live in ten minutes.",
+      brief: "Bumped — live in ~10 min.",
+    },
+  },
+  {
+    body: "Is the beta open to teams yet, or individuals only?",
+    angles: {
+      warm: "Great question — individuals only for another couple of weeks, but send me a team size and I'll put you at the top of the list.",
+      direct: "Individuals only for now. Teams open in ~2 weeks — I can waitlist yours today.",
+      brief: "Individuals for now — teams in ~2 weeks.",
+    },
+  },
+  {
+    body: "Your invoice for June is missing the PO number — can you resend?",
+    angles: {
+      warm: "Ah, my mistake — thanks for catching it. Resending with the PO number this afternoon.",
+      direct: "Fixed — corrected invoice with the PO goes out today.",
+      brief: "On it — corrected invoice today.",
+    },
+  },
+];
+
+export const ANGLES_BY_BODY = new Map(NEEDS_ITEMS.map((i) => [i.body, i.angles]));
+
 const GEN_BY_BUCKET: Record<
   Bucket,
   { snippets: string[]; direction: "in" | "out"; suggestion?: string }
@@ -379,15 +497,7 @@ const GEN_BY_BUCKET: Record<
   needs: {
     direction: "in",
     suggestion: "Open question in the last message; a short reply keeps it moving.",
-    snippets: [
-      "Quick one — does the pricing page copy still say early access? Someone asked me today.",
-      "We're finalizing the panel lineup this week. Are you in if it's the 24th?",
-      "Loved the write-up. One question about the sync engine — is it CRDT-based or op-log?",
-      "Can you resend the invite? It went to my old address.",
-      "Saw the launch — congrats! How's the first week looking?",
-      "Are you around Thursday afternoon for a quick call about the roadmap?",
-      "The venue needs a headcount by Friday — can you confirm yours?",
-    ],
+    snippets: NEEDS_ITEMS.map((i) => i.body),
   },
   drafted: {
     direction: "in",
@@ -406,6 +516,8 @@ const GEN_BY_BUCKET: Record<
       "Just shared the doc with you — flag anything that reads wrong.",
       "Offer's in your inbox. Take your time, no rush on my end.",
       "Pinged the venue about the 24th — will confirm as soon as they do.",
+      "Draft agenda's with you — add anything before I circulate it.",
+      "Sent the revised quote over — your move whenever you're ready.",
     ],
   },
   fyi: {
@@ -416,6 +528,8 @@ const GEN_BY_BUCKET: Record<
       "New build is up. The keyboard nav feels dramatically better.",
       "FYI — moved our standup doc to the shared drive, same link structure.",
       "The panel got moved to the main hall, same start time.",
+      "Office is closed Monday for the holiday — plan around it.",
+      "We renamed the shared channel; you're already in the new one.",
     ],
   },
   done: {
@@ -425,6 +539,8 @@ const GEN_BY_BUCKET: Record<
       "Perfect, that answers it — thanks!",
       "All sorted on our end. Appreciate the quick turnaround.",
       "Got it, see you there.",
+      "Confirmed for Thursday — thanks again!",
+      "Payment received — receipt's in the system.",
     ],
   },
 };
@@ -482,6 +598,7 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
             {
               id: `cg${i}d1`,
               createdAt: iso(minAgo - 10),
+          from: "full_thread",
               instructions: "Draft a reply in my voice.",
               text: GEN_DRAFT_TEXT,
             },

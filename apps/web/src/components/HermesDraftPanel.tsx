@@ -158,6 +158,17 @@ export function HermesDraftPanel({
             <p className="text-[11px] text-muted-foreground">
               Three angles — pick one with <Kbd>1</Kbd> <Kbd>2</Kbd> <Kbd>3</Kbd> or click:
             </p>
+            {/* Provenance of THESE candidates — the header pill only describes the next draft. */}
+            <p className="text-[10.5px] text-muted-foreground">
+              Drafted from:{" "}
+              <span
+                style={
+                  draft.anglesFrom === "full_thread" ? { color: "var(--priv-shared)" } : undefined
+                }
+              >
+                {POLICY_LABEL[draft.anglesFrom ?? "full_thread"].toLowerCase()}
+              </span>
+            </p>
             {draft.angles!.map((a, i) => (
               <button
                 key={a.id}
@@ -199,6 +210,14 @@ export function HermesDraftPanel({
                 <span className="text-muted-foreground">Model:</span> {draft.modelLocality} ·{" "}
                 <span className="text-muted-foreground">version</span>{" "}
                 {draft.versions.findIndex((v) => v.id === active.id) + 1}/{draft.versions.length}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Drafted from:</span>{" "}
+                <span
+                  style={active.from === "full_thread" ? { color: "var(--priv-shared)" } : undefined}
+                >
+                  {POLICY_LABEL[active.from].toLowerCase()}
+                </span>
               </p>
             </div>
 

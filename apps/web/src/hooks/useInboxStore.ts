@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Bucket, Conversation, DraftAngle, DraftAngleTone, SourceId } from "@/lib/types";
-import { AUDIT_EVENTS, CONVERSATIONS, MOCK_NOW } from "@/lib/mock-data";
+import { ANGLES_BY_BODY, AUDIT_EVENTS, CONVERSATIONS, MOCK_NOW, type AngleSet } from "@/lib/mock-data";
 import type { AuditEvent } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "error";
@@ -82,6 +82,11 @@ function pushAudit(
     ...list,
   ];
 }
+
+// In-flight mock generation, so Block can CANCEL it — the policy pill must
+// never sit above candidates it disowns.
+let draftTimer: number | null = null;
+let draftingConvId: string | null = null;
 
 export const useInboxStore = create<InboxState>((set, get) => ({
   now: MOCK_NOW,
@@ -193,14 +198,29 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   // Per-thread opt-out toggle. Blocking does not un-happen a past share
   // (threadShared stays true as historical fact); it stops future drafts
   // from reading bodies. Both directions are audited.
+  // Blocking also CANCELS any in-flight generation for this thread — the
+  // policy pill describes the next draft, and nothing may arrive under a
+  // policy the user just revoked.
   toggleHermesAccess: () => {
     const conv = get().selected();
     if (!conv) return;
     const blocking = !conv.hermesBlocked;
+    const cancelling = blocking && draftTimer !== null && draftingConvId === conv.id;
+    if (cancelling) {
+      window.clearTimeout(draftTimer!);
+      draftTimer = null;
+      draftingConvId = null;
+    }
     set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, hermesBlocked: blocking } : c,
-      ),
+      ...(cancelling ? { drafting: false } : {}),
+      conversations: s.conversations.map((c) => {
+        if (c.id !== conv.id) return c;
+        const draft =
+          cancelling && c.draft.status === "requested"
+            ? { ...c.draft, status: "not_started" as const }
+            : c.draft;
+        return { ...c, hermesBlocked: blocking, draft };
+      }),
       audit: pushAudit(
         s.audit,
         {
@@ -254,12 +274,19 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       };
     });
 
-    window.setTimeout(() => {
+    // Provenance is captured AT REQUEST TIME — this is what Hermes actually saw.
+    const policyAtRequest: "metadata_only" | "full_thread" = conv.hermesBlocked
+      ? "metadata_only"
+      : "full_thread";
+    draftingConvId = conv.id;
+    draftTimer = window.setTimeout(() => {
+      draftTimer = null;
+      draftingConvId = null;
       set((s) => ({
         drafting: false,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
-          const set = anglesFor(c.id);
+          const set = anglesFor(c);
           // Three angled candidates: 1 warm · 2 direct · 3 brief (pick by number key).
           const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
             (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: set[tone] }),
@@ -268,9 +295,10 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             ...c,
             draft: {
               ...c.draft,
-              bodyPolicy: c.hermesBlocked ? "metadata_only" : "full_thread",
+              bodyPolicy: policyAtRequest,
               status: "angles_ready",
               angles,
+              anglesFrom: policyAtRequest,
             },
           };
         }),
@@ -300,6 +328,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             ...c.draft,
             status: "generated",
             angles: undefined,
+            anglesFrom: undefined,
             versions: [
               ...c.draft.versions,
               {
@@ -307,6 +336,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
                 createdAt: new Date(s.now).toISOString(),
                 instructions: `Angle: ${angle.tone}`,
                 text: angle.text,
+                from: c.draft.anglesFrom ?? "full_thread",
               },
             ],
             activeVersionId: vid,
@@ -347,6 +377,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
                   instructions: last.instructions,
                   reason,
                   text: regenerate(last.text, reason),
+                  // A regen transforms the prior text, so it inherits that
+                  // text's provenance — Hermes saw nothing new.
+                  from: last.from,
                 },
               ],
               activeVersionId: vid,
@@ -399,12 +432,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 }));
 
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────
-// Each fixture gets three GENUINELY distinct drafts, not one text re-dressed:
+// Each thread gets three GENUINELY distinct, thread-aware drafts:
 //   WARM   = relational open + soft commit
 //   DIRECT = answer first, one line, no cushioning
 //   BRIEF  = the shortest honest reply
-type AngleSet = Record<DraftAngleTone, string>;
-
+// Hand-written sets keyed by conversation id (base fixtures) or by the last
+// incoming body (generator pool snippets, via ANGLES_BY_BODY).
 const MOCK_ANGLE_SETS: Record<string, AngleSet> = {
   // Dana: reviewed the deck? + move call to 3pm
   c1: {
@@ -426,15 +459,18 @@ const MOCK_ANGLE_SETS: Record<string, AngleSet> = {
   },
 };
 
-// Generic trio for generated fixtures — still three different replies.
+// Last-resort trio (drafting from a bucket whose content has no tailored set).
 const ANGLE_FALLBACK: AngleSet = {
   warm: "Really glad you flagged this — thank you. Let me give it proper thought today and come back tomorrow with a real answer instead of a rushed one.",
   direct: "Got it. I'll confirm one detail and have an answer for you tomorrow.",
   brief: "On it — answer by tomorrow.",
 };
 
-function anglesFor(conversationId: string): AngleSet {
-  return MOCK_ANGLE_SETS[conversationId] ?? ANGLE_FALLBACK;
+function anglesFor(conv: Conversation): AngleSet {
+  const byId = MOCK_ANGLE_SETS[conv.id];
+  if (byId) return byId;
+  const lastIncoming = [...conv.messages].reverse().find((m) => m.direction === "in");
+  return (lastIncoming && ANGLES_BY_BODY.get(lastIncoming.body)) ?? ANGLE_FALLBACK;
 }
 
 function regenerate(text: string, reason: string): string {
