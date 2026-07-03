@@ -13,7 +13,7 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 1. **Triage first.** Default home answers “what needs my attention?” not “what arrived newest?”
 2. **Keyboard is product, not polish.** Hotkeys and command palette ship in Phase 0.
 3. **Hermes is visible but not intrusive.** The agent suggests, drafts, classifies, and explains; the human remains in control.
-4. **Sharing state is always visible.** Bodies are always readable by you; *not-shared* (default, quiet) vs *shared-with-Hermes* must feel different.
+4. **Hermes presence is visible, sharing chrome is not (v4).** Amber marks where the agent is working; asking for a draft means Hermes reads the thread — no badges, no switches.
 5. **Drafts are review objects.** Drafts need versions, status, evidence, and approval state.
 6. **Source differences are metadata, not separate apps.** iMessage/LinkedIn/X should feel unified while preserving source capabilities.
 7. **Speed over configurability in v0.** Avoid complex rules/settings until the loop is excellent.
@@ -99,11 +99,10 @@ Hermes/draft:
 | `t` | triage selected/thread |
 | `m` | summarize thread |
 | `e` | add picked draft to chat (contextual; otherwise mark done) |
-| `r` | regenerate draft when draft focused |
+| `r` | refine: focus the studio chat input |
 | `x` | reject draft |
 
-Sharing is thread-level and default-on for drafting (see Privacy/sharing UX) — `d` is the share; the
-per-thread Block/Allow opt-out lives in the thread strip and palette.
+Drafting means Hermes reads the thread (see Privacy/sharing UX) — no share signaling, no opt-out switch (v4).
 
 | Key | Action |
 |---|---|
@@ -166,6 +165,8 @@ not_started
 → requested            (thread shared with Hermes here, unless blocked)
 → angles_ready         (three candidates: warm/direct/brief; pick with 1/2/3)
 → generated            (picked; read-only card, "Add to chat" is the primary action)
+→ iterated(n)          (refined via the studio chat — each instruction = a new version
+                        on the navigable stepper; the chat is the instruction record)
 → added_to_chat        (prefilled into the composer)
 → edited               (composer text diverged from the Hermes draft)
 → sent_mock            (sent from the composer — v0 = LOCAL MOCK, no real delivery,
@@ -173,13 +174,13 @@ not_started
 → future: real send path (send_queued / sent) replaces the mock
 ```
 
-Draft panel requirements:
+Draft panel requirements (v4 — the drafting studio):
 
-- shows instructions used
-- shows body policy used: metadata/full-body
-- shows model/locality: mock/local/cloud if applicable
-- supports regenerate with reason
-- supports tone/length controls
+- read-only draft card + navigable version stepper (v1/v2/v3)
+- a lightweight chat with Hermes under the card; each Hermes reply = a new version
+- the chat is the instruction record (no Instructions/Model/policy meta rows)
+- tone chips are quick-inserts into the chat input, not separate controls
+- **every control carries intent — no bare Regenerate** (`r` focuses the chat input)
 - stores versions
 - sending a Hermes-originated draft from the composer records the intent (audit `draft.sent_mock`);
   v0 "send" is a local mock append — no real delivery exists. Per the diegetic-prototype guardrail
@@ -198,30 +199,28 @@ Draft controls:
 
 ## Privacy/sharing UX
 
-> **DECISION v2 — Elijah, 2026-07-03 (supersedes per-message sharing).** Sharing is **thread-level and
-> default-on for drafting**: pressing `d` means Hermes reads the full thread — that is the point of asking
-> it to draft. Per-message share links and the `⇧V`/`z` machinery are removed.
+> **DECISION v4 — Elijah, 2026-07-03 (supersedes v2's signaling apparatus).** Consent theater collapsed:
+> the "Hermes sees this thread" chip, the Block/Allow per-thread switch, the amber row tick, the
+> body-policy pill, and "Drafted from" provenance rows are ALL removed. Your agent reading your thread
+> when you ask it to draft needs no badge or off-switch. **Amber is reframed as Hermes's PRESENCE color**
+> (the mark chip, the drafting studio, the HERMES strip label) — never a "what Hermes sees" signal.
 >
-> (v1, same day, still holds: this is a single-user local app — bodies are **always fully visible to the
-> user**; no blur, no reveal step, no human-view audit events.)
+> (Still standing: v1 — bodies always fully visible to the user, no reveal machinery; v2's core — drafting
+> means Hermes reads the thread, metadata-only until you ask.)
 
-The model in one line: **metadata-only until you ask for a draft; asking = the thread is shared.**
+The model in one line: **metadata-only until you ask for a draft; asking means Hermes reads the thread.**
 
 | State | Meaning | Visual treatment |
 |---|---|---|
-| Unshared (default) | bodies visible to you; Hermes has metadata only | **no chrome at all** |
-| Shared thread | thread bodies are in Hermes' context (a draft was requested) | amber "Hermes sees this thread" chip + amber row tick (+ audit) |
-| Blocked (opt-out) | per-thread toggle: Hermes stays metadata-only even for drafts | quiet "Hermes blocked" chip + Allow toggle |
+| Resting (default) | bodies visible to you; Hermes has metadata only | no chrome |
+| Drafting | Hermes reads the thread to draft (the point of asking) | no privacy chrome; amber presence on Hermes surfaces only |
 
 Rules:
 
-- Hermes drafts from **metadata only** until you ask for a draft; the ask shares the full thread (audited
-  once, as `hermes.thread_share`).
-- The per-thread **opt-out is reversible** (Block/Allow, both audited). Blocking pins future drafts to
-  metadata-only; it does not un-happen a past share (the amber state remains as historical fact).
-- The draft panel's body-policy pill is **live**: "Full thread" by default, "Metadata only" when blocked.
-- The agent still cannot grant itself body access: the share happens only as a consequence of the human's
-  draft request, and the opt-out is human-only.
+- Hermes drafts from **metadata only** until you ask for a draft; the ask means Hermes reads the thread
+  (audited as `draft.request`).
+- The agent still cannot grant itself body access: thread reads happen only as a consequence of the
+  human's draft request.
 
 ### Bucket semantics (Elijah addendum, 2026-07-03)
 

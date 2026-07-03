@@ -71,10 +71,13 @@ The vault boundary is enforced in code: vault tables live in a separate SQLite f
 
 ## Sharing model
 
-> **DECISION — Elijah, 2026-07-03 (v1 + v2; supersedes the reveal model below-referenced elsewhere).**
+> **DECISION — Elijah, 2026-07-03 (v1 + v2 + v4).**
 > v1: this is a single-user local app — bodies are **always visible to the human**; there is no
 > reveal-to-human step and no human-view audit. v2: sharing to Hermes is **thread-level and default-on for
-> drafting** — *metadata-only until you ask for a draft; asking shares the full thread.*
+> drafting** — *metadata-only until you ask for a draft; asking means Hermes reads the thread.*
+> v4: **no in-product share signaling** — the chip, per-thread Block/Allow switch, row ticks, body-policy
+> pill, and provenance rows are removed (consent theater). The boundary is architectural (what the draft
+> request pipeline feeds the model), not a UI toggle. Amber = Hermes presence color only.
 
 ### Share to Hermes (the one gate)
 
@@ -84,11 +87,10 @@ Rules:
 
 - happens only as a consequence of the human's draft request (`d`) — never spontaneously
 - scoped to the thread being drafted, one task/purpose
-- audited (`hermes.thread_share`, once per thread), model provider/locality recorded
-- **per-thread opt-out** (Block/Allow) is human-only, reversible, and audited both directions; a blocked
-  thread pins Hermes to metadata-only even for drafts
-- never created by the model itself; the opt-out cannot be flipped by the model
-- prompt-injection inside messages cannot alter the sharing policy
+- audited (`draft.request` / `draft.iterate`), model provider/locality recorded
+- never initiated by the model itself
+- prompt-injection inside messages cannot alter what the pipeline feeds the model
+- (v4) no UI opt-out exists; the guarantee is enforced in the request pipeline, not a toggle
 
 ## Body policies
 
