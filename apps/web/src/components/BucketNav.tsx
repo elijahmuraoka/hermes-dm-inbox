@@ -25,7 +25,7 @@ export function BucketNav() {
   return (
     <nav
       aria-label="Buckets and sources"
-      className="flex h-full w-[188px] shrink-0 flex-col gap-4 border-r border-sidebar-border bg-sidebar px-2.5 py-3"
+      className="flex h-full w-[11.75rem] shrink-0 flex-col gap-4 border-r border-sidebar-border bg-sidebar px-2.5 py-3"
     >
       <div className="flex items-center gap-2 px-1.5">
         <div
@@ -34,11 +34,11 @@ export function BucketNav() {
         >
           <HermesMark className="size-4" strokeWidth={2.2} />
         </div>
-        <span className="text-[12.5px] font-semibold tracking-[-0.01em]">Hermes Inbox</span>
+        <span className="text-[0.78125rem] font-semibold tracking-[-0.01em]">Hermes Inbox</span>
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <p className="px-1.5 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="px-1.5 pb-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
           Buckets
         </p>
         {ORDER.map((b) => {
@@ -52,7 +52,7 @@ export function BucketNav() {
               onClick={() => setBucket(b)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "group relative flex h-8 items-center gap-2 rounded-md px-2 text-left text-[12.5px]",
+                "group relative flex h-8 items-center gap-2 rounded-md px-2 text-left text-[0.78125rem]",
                 "transition-colors duration-[var(--transition-duration)] ease-[var(--ease-house)]",
                 active
                   ? "bg-accent/70 text-foreground"
@@ -80,14 +80,14 @@ export function BucketNav() {
                   title={`${u} unread`}
                 />
               )}
-              <span className="tnum text-[11px] tabular-nums text-muted-foreground">{n}</span>
+              <span className="tnum text-[0.6875rem] tabular-nums text-muted-foreground">{n}</span>
             </button>
           );
         })}
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <p className="px-1.5 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="px-1.5 pb-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
           Sources
         </p>
         <SourceItem id="all" label="All sources" />
@@ -97,7 +97,7 @@ export function BucketNav() {
       </div>
 
       <div className="mt-auto flex items-center justify-between px-1.5">
-        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
           <Kbd>?</Kbd> shortcuts
         </span>
         <ModeToggle />
@@ -116,7 +116,7 @@ function SourceItem({ id, label }: { id: SourceId | "all"; label: string }) {
       onClick={() => setSourceFilter(id)}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "flex h-7 items-center gap-2 rounded-md px-2 text-left text-[12px]",
+        "flex h-7 items-center gap-2 rounded-md px-2 text-left text-[0.75rem]",
         "transition-colors duration-[var(--transition-duration)]",
         active
           ? "bg-accent/70 text-foreground"

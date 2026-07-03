@@ -7,7 +7,7 @@ export function RowSkeleton() {
     <div className="flex h-10 w-full items-center gap-2.5 border-b border-border/60 pl-3 pr-4">
       <span className="w-2 shrink-0" />
       <span className="skeleton h-2.5 w-8 shrink-0 rounded" />
-      <span className="skeleton h-3 w-[148px] shrink-0 rounded" />
+      <span className="skeleton h-3 w-[9.25rem] shrink-0 rounded" />
       <span className="skeleton h-2.5 flex-1 rounded" />
       <span className="skeleton h-2.5 w-6 shrink-0 rounded" />
     </div>
@@ -34,8 +34,8 @@ export function EmptyBucket({ label }: { label: string }) {
       >
         <CheckCircle2 className="size-5" strokeWidth={2} />
       </div>
-      <p className="text-[13px] font-medium text-foreground">{label} is clear</p>
-      <p className="max-w-[240px] text-[12px] text-muted-foreground">
+      <p className="text-[0.8125rem] font-medium text-foreground">{label} is clear</p>
+      <p className="max-w-[15rem] text-[0.75rem] text-muted-foreground">
         Nothing needs you here right now. Move on with a calm inbox.
       </p>
     </div>
@@ -48,8 +48,8 @@ export function NoSelection() {
       <div className="flex size-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground">
         <Inbox className="size-5" strokeWidth={2} />
       </div>
-      <p className="text-[13px] font-medium text-foreground">No conversation selected</p>
-      <p className="max-w-[240px] text-[12px] text-muted-foreground">
+      <p className="text-[0.8125rem] font-medium text-foreground">No conversation selected</p>
+      <p className="max-w-[15rem] text-[0.75rem] text-muted-foreground">
         Pick a row with <span className="font-mono">j / k</span> and press{" "}
         <span className="font-mono">Enter</span>, or click one.
       </p>
@@ -67,8 +67,8 @@ export function ErrorState({ source, onRetry }: { source: string; onRetry: () =>
       >
         <RotateCw className="size-5" strokeWidth={2} />
       </div>
-      <p className="text-[13px] font-medium text-foreground">Couldn’t sync {source}</p>
-      <p className="max-w-[260px] text-[12px] text-muted-foreground">
+      <p className="text-[0.8125rem] font-medium text-foreground">Couldn’t sync {source}</p>
+      <p className="max-w-[16.25rem] text-[0.75rem] text-muted-foreground">
         The connector didn’t respond. Your existing messages are unaffected.
       </p>
       <Button variant="secondary" size="sm" onClick={onRetry}>

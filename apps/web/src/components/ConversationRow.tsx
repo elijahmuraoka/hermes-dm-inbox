@@ -69,7 +69,7 @@ function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowPro
 
       <span
         className={cn(
-          "w-[148px] shrink-0 truncate text-[12.5px] tracking-[-0.005em]",
+          "w-[9.25rem] shrink-0 truncate text-[0.78125rem] tracking-[-0.005em]",
           c.unread ? "font-semibold text-foreground" : "font-medium text-foreground/90",
         )}
       >
@@ -91,11 +91,11 @@ function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowPro
         />
       )}
 
-      <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+      <span className="min-w-0 flex-1 truncate text-[0.75rem] text-muted-foreground">
         {lastMsg?.preview}
       </span>
 
-      <span className="tnum shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span className="tnum shrink-0 font-mono text-[0.6875rem] tabular-nums text-muted-foreground">
         {relTime(c.lastActivity, now)}
       </span>
     </button>

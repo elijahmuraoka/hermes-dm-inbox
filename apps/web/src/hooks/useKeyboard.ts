@@ -58,8 +58,15 @@ export function useKeyboard() {
           e.preventDefault();
           return void st.selectPrev();
         case "Enter":
+          // From the list: open the thread. Already in the thread: focus the
+          // composer (the natural next act is replying).
           e.preventDefault();
+          if (st.mobilePane === "thread") return void st.focusComposer();
           return void st.openThread();
+        case "c":
+          // Reply: jump straight to the composer.
+          e.preventDefault();
+          return void st.focusComposer();
         case "u":
           e.preventDefault();
           return void st.backToList();
@@ -70,6 +77,9 @@ export function useKeyboard() {
           e.preventDefault();
           return void st.setShortcuts(true);
         case "e":
+          // Contextual: with a picked draft on the card, e = Add to chat
+          // (the primary draft action); otherwise e = mark done.
+          if (st.selected()?.draft.status === "generated") return void st.addToChat();
           return void st.markDone();
         case "s":
           return void st.snooze();
@@ -77,8 +87,6 @@ export function useKeyboard() {
           return void st.togglePriority();
         case "d":
           return void st.requestDraft();
-        case "a":
-          return void st.approveDraft();
         case "1":
         case "2":
         case "3":

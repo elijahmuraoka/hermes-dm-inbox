@@ -23,7 +23,7 @@ export function Topbar() {
       <button
         type="button"
         onClick={() => setPalette(true)}
-        className="group flex h-7 min-w-0 max-w-[340px] flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 text-left text-[12px] text-muted-foreground transition-colors hover:border-primary/25 hover:bg-muted/60"
+        className="group flex h-7 min-w-0 max-w-[21.25rem] flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 text-left text-[0.75rem] text-muted-foreground transition-colors hover:border-primary/25 hover:bg-muted/60"
       >
         <Search className="size-3.5 shrink-0" />
         <span className="flex-1 truncate">Search people, messages, tasks…</span>
@@ -31,7 +31,7 @@ export function Topbar() {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <span className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+        <span className="flex items-center gap-1.5 text-[0.71875rem] text-muted-foreground">
           <span
             className="size-1.5 rounded-full"
             style={{
@@ -48,7 +48,7 @@ export function Topbar() {
           aria-label="Open command palette"
           className="flex items-center rounded-md p-0.5 transition-colors hover:bg-accent"
         >
-          <Kbd className="h-6 px-2 text-[11px]">⌘K</Kbd>
+          <Kbd className="h-6 px-2 text-[0.6875rem]">⌘K</Kbd>
         </button>
       </div>
     </header>

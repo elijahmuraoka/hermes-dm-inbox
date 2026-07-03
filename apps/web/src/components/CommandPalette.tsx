@@ -11,6 +11,7 @@ import {
   Inbox,
   RefreshCw,
   Search,
+  SendHorizontal,
   Share2,
 } from "lucide-react";
 
@@ -43,7 +44,10 @@ export function CommandPalette() {
   const markDone = useInboxStore((s) => s.markDone);
   const snooze = useInboxStore((s) => s.snooze);
   const requestDraft = useInboxStore((s) => s.requestDraft);
-  const approveDraft = useInboxStore((s) => s.approveDraft);
+  const addToChat = useInboxStore((s) => s.addToChat);
+  const focusComposer = useInboxStore((s) => s.focusComposer);
+  const sendMock = useInboxStore((s) => s.sendMock);
+  const composerText = useInboxStore((s) => s.composerText);
   const selected = useInboxStore((s) => s.selected());
 
   useEffect(() => {
@@ -121,14 +125,34 @@ export function CommandPalette() {
         disabled: !selected,
       },
       {
-        id: "draft-approve",
-        label: "Approve draft intent",
+        id: "draft-add-to-chat",
+        label: "Add draft to chat",
         group: "Draft",
         scope: "thread",
-        keys: "a",
+        keys: "e",
         icon: FileText,
-        run: withClose(() => approveDraft()),
+        run: withClose(() => addToChat()),
         disabled: !selected || selected.draft.versions.length === 0,
+      },
+      {
+        id: "composer-reply",
+        label: "Reply (focus composer)",
+        group: "Draft",
+        scope: "thread",
+        keys: "c",
+        icon: ArrowRight,
+        run: withClose(() => focusComposer()),
+        disabled: !selected,
+      },
+      {
+        id: "composer-send",
+        label: "Send message (mock — local only)",
+        group: "Draft",
+        scope: "thread",
+        keys: "⌘⏎",
+        icon: SendHorizontal,
+        run: withClose(() => sendMock()),
+        disabled: !selected || !composerText.trim(),
       },
       // Privacy — the thread-level gate. Drafting shares the thread by default;
       // this is the per-thread opt-out (and its undo).
@@ -177,7 +201,7 @@ export function CommandPalette() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, setBucket, setSourceFilter, markDone, snooze, requestDraft, approveDraft, setShortcuts]);
+  }, [selected, composerText, setBucket, setSourceFilter, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
     const order = ["Navigate", "Sync", "Search", "Triage", "Draft", "Privacy", "Dev"];
@@ -197,7 +221,7 @@ export function CommandPalette() {
       onClick={close}
     >
       <div
-        className="animate-scale-in w-full max-w-[560px] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+        className="animate-scale-in w-full max-w-[35rem] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <Command
@@ -205,26 +229,27 @@ export function CommandPalette() {
           className="flex flex-col"
           label="Command palette"
         >
-          {/* Single standard --ring treatment on the row (focus-within); the
-              input itself is bare so we never stack two outlines. */}
-          <div className="flex items-center gap-2 border-b border-border px-3 transition-shadow focus-within:shadow-[inset_0_0_0_1px_var(--ring)]">
+          {/* NO focus ring here — the open modal IS the focus scope
+              (Raycast/Linear pattern). Borderless input, caret + placeholder,
+              hairline divider below, esc chip. */}
+          <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="size-4 text-muted-foreground" />
             <Command.Input
               autoFocus
               placeholder="Type a command or search…"
-              className="h-11 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
+              className="h-11 flex-1 border-0 bg-transparent text-[0.8125rem] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus:ring-0 focus-visible:!shadow-none focus-visible:!outline-none focus-visible:!ring-0"
             />
             <Kbd>esc</Kbd>
           </div>
           <Command.List className="max-h-[52vh] overflow-y-auto p-1.5">
-            <Command.Empty className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
+            <Command.Empty className="px-3 py-6 text-center text-[0.78125rem] text-muted-foreground">
               No matching commands.
             </Command.Empty>
             {groups.map(([group, cmds]) => (
               <Command.Group
                 key={group}
                 heading={
-                  <span className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <span className="px-2 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
                     {group}
                   </span>
                 }
@@ -239,8 +264,8 @@ export function CommandPalette() {
                     className={cmdItemClass}
                   >
                     <c.icon className="size-3.5 text-muted-foreground" />
-                    <span className="flex-1 text-[12.5px]">{c.label}</span>
-                    <span className="rounded-[4px] bg-muted/60 px-1.5 py-px font-mono text-[9.5px] text-muted-foreground">
+                    <span className="flex-1 text-[0.78125rem]">{c.label}</span>
+                    <span className="rounded-[4px] bg-muted/60 px-1.5 py-px font-mono text-[0.59375rem] text-muted-foreground">
                       {SCOPE_LABEL[c.scope]}
                     </span>
                     {c.keys && <Kbd>{c.keys}</Kbd>}

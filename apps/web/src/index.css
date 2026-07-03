@@ -160,6 +160,11 @@
   }
   html {
     color-scheme: light;
+    /* THE scale knob (Elijah, 2026-07-03: "+~8%, easier to read, keep the
+       density rhythm"). Every font size and structural width in the app is
+       rem-based, so this single value scales the whole cockpit in proportion.
+       108% → base body 0.8125rem renders ~14px (was 13), meta 0.75rem ~13px. */
+    font-size: 108%;
   }
   html.dark {
     color-scheme: dark;
@@ -168,7 +173,7 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 1.4;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;

@@ -33,6 +33,11 @@ interface InboxState {
   shortcutsOpen: boolean;
   drafting: boolean;
 
+  // composer — the ONE editing surface (drafts are prefills, not editors)
+  composerText: string;
+  composerAttach: boolean; // mock attachment intent (v0 records intent only)
+  composerFocusTick: number; // bump → the thread composer focuses itself
+
   // derived
   visibleConversations: () => Conversation[];
   selected: () => Conversation | null;
@@ -60,10 +65,16 @@ interface InboxState {
 
   // hermes draft
   requestDraft: () => void; // → 3 angled candidates (angles_ready)
-  chooseAngle: (n: 1 | 2 | 3) => void; // number-key pick → generated
+  chooseAngle: (n: 1 | 2 | 3) => void; // number-key pick → generated (read-only card)
   regenerateDraft: (reason: string) => void;
   applyTone: (toneId: string) => void;
-  approveDraft: () => void;
+  addToChat: () => void; // e: prefill the composer with the active draft version
+
+  // composer
+  setComposerText: (text: string) => void;
+  toggleAttach: () => void; // mock affordance — records intent, delivers nothing
+  focusComposer: () => void;
+  sendMock: () => void; // ⌘Enter: local mock append, honestly labeled
 
   // lifecycle
   retryLoad: () => void;
@@ -102,6 +113,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   paletteOpen: false,
   shortcutsOpen: false,
   drafting: false,
+  composerText: "",
+  composerAttach: false,
+  composerFocusTick: 0,
 
   visibleConversations: () => {
     const { conversations, activeBucket, sourceFilter } = get();
@@ -133,7 +147,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!list.length) return;
     const idx = list.findIndex((c) => c.id === get().selectedId);
     const next = list[Math.min(idx + 1, list.length - 1)] ?? list[0];
-    set({ selectedId: next.id });
+    // Composer is per-thread: never let text bleed across conversations.
+    if (next.id !== get().selectedId)
+      set({ selectedId: next.id, composerText: "", composerAttach: false });
   },
 
   selectPrev: () => {
@@ -141,10 +157,16 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!list.length) return;
     const idx = list.findIndex((c) => c.id === get().selectedId);
     const prev = list[Math.max(idx - 1, 0)] ?? list[0];
-    set({ selectedId: prev.id });
+    if (prev.id !== get().selectedId)
+      set({ selectedId: prev.id, composerText: "", composerAttach: false });
   },
 
-  selectId: (id) => set({ selectedId: id, mobilePane: "thread" }),
+  selectId: (id) =>
+    set((s) => ({
+      selectedId: id,
+      mobilePane: "thread",
+      ...(id !== s.selectedId ? { composerText: "", composerAttach: false } : {}),
+    })),
   openThread: () => {
     if (get().selectedId) set({ mobilePane: "thread" });
   },
@@ -395,22 +417,127 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     get().regenerateDraft(label);
   },
 
-  approveDraft: () => {
+  // "Add to chat": the draft becomes a PREFILL in the composer — the one
+  // editing surface. The panel card stays read-only. (Guard: no phantom adds.)
+  addToChat: () => {
     const conv = get().selected();
-    // N1 guard: approving a draft that doesn't exist must be impossible from
-    // EVERY surface — no lifecycle write, no audit event for a phantom draft.
-    if (!conv || conv.draft.versions.length === 0) return;
+    const version = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    if (!conv || !version) return;
     set((s) => ({
-      draftSheetOpen: true, // N2: feedback surface must be visible below lg
+      composerText: version.text,
+      composerFocusTick: s.composerFocusTick + 1,
+      draftSheetOpen: false, // the action moves to the composer; clear the way
+      mobilePane: "thread",
       conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "approved_intent" } } : c,
+        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "added_to_chat" } } : c,
       ),
       audit: pushAudit(
         s.audit,
-        { actor: "human", surface: "ui", action: "draft.approve_intent", resource: conv.id, result: "allowed" },
+        { actor: "human", surface: "ui", action: "draft.added_to_chat", resource: conv.id, result: "allowed" },
         s.now,
       ),
     }));
+  },
+
+  setComposerText: (text) => {
+    const conv = get().selected();
+    const active = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    // Hermes-originated prefill that diverges from the draft → status "edited".
+    const diverged =
+      conv &&
+      active &&
+      (conv.draft.status === "added_to_chat" || conv.draft.status === "edited") &&
+      text !== active.text;
+    set((s) => ({
+      composerText: text,
+      conversations: diverged
+        ? s.conversations.map((c) =>
+            c.id === conv.id ? { ...c, draft: { ...c.draft, status: "edited" } } : c,
+          )
+        : s.conversations,
+    }));
+  },
+
+  // Mock affordance: records the intent, delivers nothing (honesty guardrail).
+  toggleAttach: () => {
+    const conv = get().selected();
+    const next = !get().composerAttach;
+    set((s) => ({
+      composerAttach: next,
+      audit: conv
+        ? pushAudit(
+            s.audit,
+            {
+              actor: "human",
+              surface: "ui",
+              action: next ? "attachment.intent" : "attachment.intent_removed",
+              resource: conv.id,
+              result: "allowed",
+            },
+            s.now,
+          )
+        : s.audit,
+    }));
+  },
+
+  focusComposer: () => {
+    if (!get().selectedId) return;
+    set((s) => ({ mobilePane: "thread", composerFocusTick: s.composerFocusTick + 1 }));
+  },
+
+  // v0 send = LOCAL MOCK: appends to the thread, honestly labeled, never
+  // delivered. Sending a Hermes-originated draft is the intent gesture that
+  // replaced the approve-intent ceremony (same audit semantics, natural act).
+  sendMock: () => {
+    const conv = get().selected();
+    const text = get().composerText.trim();
+    if (!conv || !text) return;
+    const active = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    const fromHermes =
+      conv.draft.status === "added_to_chat" ||
+      (conv.draft.status === "edited" && !!active);
+    set((s) => {
+      const nowIso = new Date(s.now).toISOString();
+      return {
+        composerText: "",
+        composerAttach: false,
+        conversations: s.conversations.map((c) => {
+          if (c.id !== conv.id) return c;
+          const mid = `${c.id}m${c.messages.length + 1}`;
+          return {
+            ...c,
+            // You replied — the ball is in their court now.
+            bucket: c.bucket === "needs" || c.bucket === "drafted" ? "waiting" : c.bucket,
+            unread: false,
+            lastActivity: nowIso,
+            messages: [
+              ...c.messages,
+              {
+                id: mid,
+                authorId: "me",
+                direction: "out" as const,
+                timestamp: nowIso,
+                preview: text.length > 64 ? `${text.slice(0, 61)}…` : text,
+                body: text,
+                mockSent: true,
+              },
+            ],
+            draft: fromHermes ? { ...c.draft, status: "sent_mock" as const } : c.draft,
+          };
+        }),
+        audit: pushAudit(
+          s.audit,
+          {
+            actor: "human",
+            surface: "ui",
+            action: fromHermes ? "draft.sent_mock" : "message.sent_mock",
+            resource: conv.id,
+            result: "allowed",
+          },
+          s.now,
+        ),
+      };
+    });
   },
 
   // Recoverable by design: retry runs a fresh mock sync and restores the fixtures.

@@ -11,13 +11,18 @@ export type Bucket = "needs" | "drafted" | "waiting" | "fyi" | "done";
 
 export type Urgency = "high" | "normal" | "low";
 
+// Composer-first lifecycle (Elijah, 2026-07-03 v3): drafts are PREFILLS.
+// "Add to chat" drops the text into the composer — the one editing surface —
+// and sending from there is the intent gesture (approve-intent ceremony
+// retired). v0 send is a LOCAL MOCK: no real delivery, honestly labeled.
 export type DraftStatus =
   | "not_started"
   | "requested"
   | "angles_ready" // three angled candidates await a 1/2/3 pick
-  | "generated"
-  | "edited"
-  | "approved_intent";
+  | "generated" // picked angle, read-only card in the panel
+  | "added_to_chat" // prefilled into the composer
+  | "edited" // composer text diverged from the Hermes draft
+  | "sent_mock"; // sent from the composer (local mock append)
 
 // What Hermes sees when it drafts: metadata, or the full thread (default on `d`).
 export type BodyPolicy = "metadata_only" | "full_thread";
@@ -38,6 +43,7 @@ export interface Message {
   timestamp: string; // ISO
   preview: string; // list snippet (first line of body); density, not redaction
   body: string; // always visible to the human — this is a single-user local app
+  mockSent?: boolean; // v0 composer send: local append only, never delivered
 }
 
 export interface DraftAngle {

@@ -75,8 +75,11 @@ primary focal area; never a decorative gradient wash (canon §3).
 
 - **Sans:** Geist Sans (fallback `ui-sans-serif, system-ui`). **Mono:** Geist Mono / IBM Plex Mono for
   timestamps, counts, IDs, keycaps, source handles. **Never Inter, never Georgia, never Roboto** (canon §5).
-- Dense power-user scale: base **13px** body, 12px metadata, 11px keycaps; row text 13px. Headings tight
-  (`letter-spacing:-0.01em`). Line-height 1.35–1.45 in dense lists.
+- **Root-scaled** (Elijah, 2026-07-03: "+~8%, easier to read, same discipline"): every font size and
+  structural width is **rem-based**, and `html { font-size: 108% }` is the ONE scale knob — proportions hold,
+  density rhythm intact. Dense power-user scale at the 108% root: base **0.8125rem body (~14px rendered)**,
+  0.75rem metadata (~13px), 0.6875rem keycaps (~11.9px); rows 2.5rem (~43px). Headings tight
+  (`letter-spacing:-0.01em`). Line-height 1.35–1.45 in dense lists. Hairlines (edge ticks, borders) stay px.
 - **Numerals rule (fixes the flagship `$1,180` defect):** one `Num`/`Metric` treatment everywhere —
   `font-variant-numeric: tabular-nums`, the currency/unit affix rendered in a **fixed unit slot at ~0.62em on
   the *same baseline*** (not a floating superscript), consistent prefix-vs-suffix per metric type. No bespoke
@@ -155,12 +158,19 @@ Each ships with **all states** — default · hover · focus-visible · selected
 3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message chrome).
    The Hermes strip carries the thread-level state: amber **"Hermes sees this thread"** chip once shared,
    **Block/Allow** opt-out toggle, nothing when unshared.
-4. **HermesDraftPanel** — lifecycle (`requested→angles_ready→generated→edited→approved_intent`); on `d`
-   Hermes returns **three angled candidates (1 warm · 2 direct · 3 brief)** picked by number key; live
-   **body-policy pill describes only the NEXT draft**, while candidates and versions carry their own
-   **"Drafted from:" provenance** (what Hermes actually saw when that text was made). Blocking a thread
-   **cancels any in-flight generation** — nothing may arrive under a revoked policy. Tone controls,
-   regenerate-with-reason, version list, approve-intent. Side rail at `xl+`, bottom sheet below.
+4. **HermesDraftPanel** — lifecycle (`requested→angles_ready→generated→added_to_chat→edited→sent_mock`;
+   the approve-intent ceremony is RETIRED — sending from the composer is the intent gesture, audited as
+   `draft.sent_mock`). On `d` Hermes returns **three angled candidates (1 warm · 2 direct · 3 brief)**
+   picked by number key; the picked card is **read-only** with **"Add to chat" as the primary action**
+   (`e`) — drafts are PREFILLS, the composer is the one editing surface. Live **body-policy pill describes
+   only the NEXT draft**; candidates and versions carry **"Drafted from:" provenance**. Blocking a thread
+   **cancels any in-flight generation**. Tone controls + regenerate-with-reason operate on the card. Side
+   rail at `xl+`, bottom sheet below.
+4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
+   button (**mock affordance — records intent only**), Send. `c` or `Enter`-in-thread focuses it; `⌘Enter`
+   sends; `Esc` returns to list scope. **v0 send = LOCAL MOCK**: appends the outgoing message with a
+   subtle "✓ mock — not delivered" label, moves the thread to Waiting on them, and the honesty footer
+   ("v0 sends are local mock — no real delivery") is always visible.
 5. **CommandPalette (⌘K)** — categorized (Navigate/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.
 6. **ThreadShareState** — the thread-level signal from §3 (chip + toggle in the Thread strip); the row tick
@@ -203,8 +213,9 @@ A slice is done only when, on a **real running app with mock data**, rendered an
 3. Ask for a draft (`d`): the thread flips to the **amber "Hermes sees this thread"** state (chip + row
    tick), instantly legible without reading labels; the **Block/Allow** opt-out works and is audited.
 4. `⌘K` palette opens <100ms, categorized, keyboard-only usable; `?` shows shortcuts.
-5. `d` returns **three angles**; `1/2/3` picks one; lifecycle + live body-policy pill (**Full thread**
-   default, **Metadata only** when blocked) visible; approve intent (`a`).
+5. `d` returns **three angles**; `1/2/3` picks one; `e` adds it to the composer; edit there; `⌘Enter`
+   mock-sends with the honest label; lifecycle + live body-policy pill (**Full thread** default,
+   **Metadata only** when blocked) + "Drafted from:" provenance visible throughout.
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.

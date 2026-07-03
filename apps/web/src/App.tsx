@@ -55,7 +55,7 @@ export default function App() {
           {/* List — full width in single-pane mode, fixed rail from lg. */}
           <div
             className={cn(
-              "min-w-0 flex-1 lg:max-w-[340px] xl:max-w-[380px] lg:flex-none",
+              "min-w-0 flex-1 lg:max-w-[21.25rem] xl:max-w-[23.75rem] lg:flex-none",
               mobilePane === "thread" ? "hidden lg:block" : "block",
             )}
           >

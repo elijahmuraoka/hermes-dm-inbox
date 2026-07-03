@@ -3,7 +3,7 @@ import { useInboxStore, TONE_CONTROLS } from "@/hooks/useInboxStore";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Check, RotateCw, X } from "lucide-react";
+import { Check, RotateCw, SendHorizontal, X } from "lucide-react";
 import { HermesMark } from "@/components/HermesMark";
 
 // Rail has four segments; angles_ready sits inside "requested" territory.
@@ -12,16 +12,18 @@ const RANK: Record<DraftStatus, number> = {
   requested: 0,
   angles_ready: 0,
   generated: 1,
+  added_to_chat: 2,
   edited: 2,
-  approved_intent: 3,
+  sent_mock: 3,
 };
 const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
   not_started: "Not started",
   requested: "Requested",
   angles_ready: "Pick an angle",
   generated: "Generated",
-  edited: "Edited",
-  approved_intent: "Approved (intent)",
+  added_to_chat: "In composer",
+  edited: "Edited in composer",
+  sent_mock: "Sent (mock)",
 };
 
 const POLICY_LABEL: Record<BodyPolicy, string> = {
@@ -47,14 +49,14 @@ export function HermesDraftPanel({
   const chooseAngle = useInboxStore((s) => s.chooseAngle);
   const regenerateDraft = useInboxStore((s) => s.regenerateDraft);
   const applyTone = useInboxStore((s) => s.applyTone);
-  const approveDraft = useInboxStore((s) => s.approveDraft);
+  const addToChat = useInboxStore((s) => s.addToChat);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
 
   const draft = c.draft;
   const active = draft.versions.find((v) => v.id === draft.activeVersionId);
   const hasVersion = draft.versions.length > 0;
   const anglesPending = draft.status === "angles_ready" && !!draft.angles;
-  const approved = draft.status === "approved_intent";
+  const sent = draft.status === "sent_mock";
 
   // What Hermes sees for the NEXT draft, derived live from the thread state:
   // full thread by default (that's the point of asking), metadata if blocked.
@@ -65,7 +67,7 @@ export function HermesDraftPanel({
       aria-label="Hermes draft panel"
       className={cn(
         "flex flex-col bg-card/40",
-        mode === "side" ? "h-full w-[340px] shrink-0 border-l border-border" : "h-full w-full",
+        mode === "side" ? "h-full w-[21.25rem] shrink-0 border-l border-border" : "h-full w-full",
       )}
     >
       {/* header */}
@@ -76,9 +78,9 @@ export function HermesDraftPanel({
         >
           <HermesMark className="size-3.5" strokeWidth={2.4} />
         </span>
-        <span className="text-[12.5px] font-semibold tracking-[-0.01em]">Hermes draft</span>
+        <span className="text-[0.78125rem] font-semibold tracking-[-0.01em]">Hermes draft</span>
         <span
-          className="tnum ml-auto rounded-[5px] border px-1.5 py-px font-mono text-[10px]"
+          className="tnum ml-auto rounded-[5px] border px-1.5 py-px font-mono text-[0.625rem]"
           style={{
             color: livePolicy === "full_thread" ? "var(--priv-shared)" : "var(--muted-foreground)",
             borderColor:
@@ -118,7 +120,7 @@ export function HermesDraftPanel({
             </div>
           );
         })}
-        <span className="tnum ml-2 shrink-0 font-mono text-[10.5px] text-muted-foreground">
+        <span className="tnum ml-2 shrink-0 font-mono text-[0.65625rem] text-muted-foreground">
           {LIFECYCLE_LABEL[draft.status]}
         </span>
       </div>
@@ -127,7 +129,7 @@ export function HermesDraftPanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3">
         {!hasVersion && !anglesPending && !drafting && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="max-w-[230px] text-[12.5px] text-muted-foreground">
+            <p className="max-w-[14.375rem] text-[0.78125rem] text-muted-foreground">
               {c.hermesBlocked
                 ? "Hermes is blocked on this thread — drafts will use metadata only."
                 : "Asking for a draft shares this thread with Hermes — that's the point. You can block it per thread."}
@@ -143,7 +145,7 @@ export function HermesDraftPanel({
 
         {drafting && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-[0.71875rem] text-muted-foreground">
               <RotateCw className="size-3 animate-spin" /> Hermes is drafting…
             </div>
             <div className="skeleton h-3 w-full rounded" />
@@ -155,11 +157,11 @@ export function HermesDraftPanel({
         {/* three angled candidates — pick with 1 / 2 / 3 */}
         {anglesPending && !drafting && (
           <div className="animate-stream space-y-2">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
               Three angles — pick one with <Kbd>1</Kbd> <Kbd>2</Kbd> <Kbd>3</Kbd> or click:
             </p>
             {/* Provenance of THESE candidates — the header pill only describes the next draft. */}
-            <p className="text-[10.5px] text-muted-foreground">
+            <p className="text-[0.65625rem] text-muted-foreground">
               Drafted from:{" "}
               <span
                 style={
@@ -181,10 +183,10 @@ export function HermesDraftPanel({
               >
                 <Kbd className="mt-0.5">{i + 1}</Kbd>
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[0.65625rem] font-semibold uppercase tracking-wider text-muted-foreground">
                     {ANGLE_LABEL[a.tone]}
                   </span>
-                  <span className="text-[12.5px] leading-relaxed text-foreground">{a.text}</span>
+                  <span className="text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
                 </span>
               </button>
             ))}
@@ -193,11 +195,11 @@ export function HermesDraftPanel({
 
         {hasVersion && !drafting && !anglesPending && active && (
           <div className="animate-stream space-y-3">
-            <div className="rounded-lg border border-border bg-background/60 p-3 text-[13px] leading-relaxed text-foreground">
+            <div className="rounded-lg border border-border bg-background/60 p-3 text-[0.8125rem] leading-relaxed text-foreground">
               {active.text}
             </div>
 
-            <div className="space-y-1 text-[11px] text-muted-foreground">
+            <div className="space-y-1 text-[0.6875rem] text-muted-foreground">
               <p>
                 <span className="text-muted-foreground">Instructions:</span> {active.instructions}
               </p>
@@ -223,20 +225,20 @@ export function HermesDraftPanel({
 
             {draft.versions.length > 1 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
                   Versions
                 </p>
                 {draft.versions.map((v, i) => (
                   <div
                     key={v.id}
                     className={cn(
-                      "truncate rounded-md border px-2 py-1 text-[11px]",
+                      "truncate rounded-md border px-2 py-1 text-[0.6875rem]",
                       v.id === active.id
                         ? "border-primary/30 bg-primary/5 text-foreground"
                         : "border-border text-muted-foreground",
                     )}
                   >
-                    <span className="tnum mr-1.5 font-mono text-[10px] text-muted-foreground">
+                    <span className="tnum mr-1.5 font-mono text-[0.625rem] text-muted-foreground">
                       v{i + 1}
                     </span>
                     {v.reason ?? v.instructions}
@@ -256,7 +258,7 @@ export function HermesDraftPanel({
                     onClick={() => applyTone(t.id)}
                     disabled={drafting}
                     className={cn(
-                      "rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground",
+                      "rounded-full border border-border px-2 py-0.5 text-[0.6875rem] text-muted-foreground",
                       "transition-colors hover:border-primary/30 hover:bg-accent hover:text-foreground",
                       "disabled:opacity-40",
                     )}
@@ -275,28 +277,32 @@ export function HermesDraftPanel({
                 >
                   <RotateCw /> Regenerate <Kbd className="ml-0.5">r</Kbd>
                 </Button>
+                {/* PRIMARY action: the draft is a prefill — editing happens in
+                    the composer, the one editing surface. Approve-intent
+                    ceremony retired; sending IS the intent gesture. */}
                 <Button
-                  variant={approved ? "secondary" : "primary"}
+                  variant={sent ? "secondary" : "primary"}
                   size="sm"
                   className="flex-1"
-                  onClick={approveDraft}
-                  disabled={drafting || approved}
+                  onClick={addToChat}
+                  disabled={drafting}
                 >
-                  <Check /> {approved ? "Approved" : "Approve"}{" "}
+                  {sent ? <Check /> : <SendHorizontal />}{" "}
+                  {sent ? "Sent (mock)" : "Add to chat"}{" "}
                   <Kbd
                     className={cn(
                       "ml-0.5",
-                      !approved &&
+                      !sent &&
                         "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground",
                     )}
                   >
-                    a
+                    e
                   </Kbd>
                 </Button>
               </div>
-              <p className="text-[10.5px] leading-snug text-muted-foreground">
-                Approve records <span className="text-muted-foreground">intent only</span>. No send
-                path exists in v0 — Hermes drafts, never sends.
+              <p className="text-[0.65625rem] leading-snug text-muted-foreground">
+                This card is read-only — edit in the composer. v0 sends are local mock: no real
+                delivery. Hermes drafts; you send.
               </p>
             </div>
           </div>

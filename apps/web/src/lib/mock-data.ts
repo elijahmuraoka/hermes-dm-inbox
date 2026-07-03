@@ -198,7 +198,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
       },
     ],
     draft: {
-      status: "edited",
+      status: "generated",
       bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c5d2",
@@ -352,10 +352,11 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(4300),
         preview: "Perfect, see you then.",
         body: "Perfect, see you then.",
+        mockSent: true,
       },
     ],
     draft: {
-      status: "approved_intent",
+      status: "sent_mock",
       bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c10d1",

@@ -27,15 +27,15 @@ export function ConversationList() {
   return (
     <div className="flex h-full min-w-0 flex-col border-r border-border">
       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-b border-border px-4 py-1.5">
-        <h2 className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[-0.01em]">
+        <h2 className="flex items-center gap-2 text-[0.78125rem] font-semibold tracking-[-0.01em]">
           {BUCKET_META[activeBucket].label}
           {/* An errored sync can't vouch for a count — show unknown, not stale. */}
-          <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[10.5px] tabular-nums text-muted-foreground">
+          <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[0.65625rem] tabular-nums text-muted-foreground">
             {loadState === "error" ? "—" : list.length}
           </span>
         </h2>
         {/* One-line semantics so the bucket model is self-evident (Elijah addendum). */}
-        <p className="truncate text-[10.5px] text-muted-foreground">
+        <p className="truncate text-[0.65625rem] text-muted-foreground">
           {BUCKET_META[activeBucket].desc}
         </p>
       </div>
