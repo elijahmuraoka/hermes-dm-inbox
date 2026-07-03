@@ -1,21 +1,18 @@
 import { create } from "zustand";
-import type { Bucket, Conversation, DraftAngle, DraftAngleTone, SourceId } from "@/lib/types";
+import type { Bucket, Conversation, DraftAngle, DraftAngleTone, DraftChatMsg, SourceId } from "@/lib/types";
 import { ANGLES_BY_BODY, AUDIT_EVENTS, CONVERSATIONS, MOCK_NOW, type AngleSet } from "@/lib/mock-data";
 import type { AuditEvent } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "error";
 
-interface DraftToneOption {
-  id: string;
-  label: string;
-}
-
-export const TONE_CONTROLS: DraftToneOption[] = [
-  { id: "warmer", label: "Warmer" },
-  { id: "shorter", label: "Shorter" },
-  { id: "direct", label: "More direct" },
-  { id: "context", label: "Add context" },
-  { id: "voice", label: "Preserve my voice" },
+// Studio quick-chips: they INSERT text into the chat input (the user can edit
+// before sending) — they are not separate controls (Elijah v4).
+export const QUICK_CHIPS: { label: string; insert: string }[] = [
+  { label: "Warmer", insert: "Make it warmer" },
+  { label: "Shorter", insert: "Make it shorter" },
+  { label: "More direct", insert: "Make it more direct" },
+  { label: "Add context", insert: "Add that " },
+  { label: "My voice", insert: "Keep my voice, just polish it" },
 ];
 
 interface InboxState {
@@ -37,6 +34,7 @@ interface InboxState {
   composerText: string;
   composerAttach: boolean; // mock attachment intent (v0 records intent only)
   composerFocusTick: number; // bump → the thread composer focuses itself
+  studioFocusTick: number; // bump → the studio chat input focuses itself (r)
 
   // derived
   visibleConversations: () => Conversation[];
@@ -60,14 +58,12 @@ interface InboxState {
   snooze: (id?: string) => void;
   togglePriority: (id?: string) => void;
 
-  // privacy — thread-level gate: drafting shares the thread unless blocked
-  toggleHermesAccess: () => void; // per-thread opt-out: block/allow Hermes body access
-
-  // hermes draft
+  // hermes draft — the drafting studio
   requestDraft: () => void; // → 3 angled candidates (angles_ready)
   chooseAngle: (n: 1 | 2 | 3) => void; // number-key pick → generated (read-only card)
-  regenerateDraft: (reason: string) => void;
-  applyTone: (toneId: string) => void;
+  iterateDraft: (instruction: string) => void; // studio chat turn → NEW version
+  setActiveVersion: (id: string) => void; // stepper navigation (v1/v2/v3)
+  focusStudio: () => void; // r: focus the studio chat input (intent required — no bare regen)
   addToChat: () => void; // e: prefill the composer with the active draft version
 
   // composer
@@ -94,11 +90,6 @@ function pushAudit(
   ];
 }
 
-// In-flight mock generation, so Block can CANCEL it — the policy pill must
-// never sit above candidates it disowns.
-let draftTimer: number | null = null;
-let draftingConvId: string | null = null;
-
 export const useInboxStore = create<InboxState>((set, get) => ({
   now: MOCK_NOW,
   loadState: "loading",
@@ -116,6 +107,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   composerText: "",
   composerAttach: false,
   composerFocusTick: 0,
+  studioFocusTick: 0,
 
   visibleConversations: () => {
     const { conversations, activeBucket, sourceFilter } = get();
@@ -217,93 +209,27 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
   },
 
-  // Per-thread opt-out toggle. Blocking does not un-happen a past share
-  // (threadShared stays true as historical fact); it stops future drafts
-  // from reading bodies. Both directions are audited.
-  // Blocking also CANCELS any in-flight generation for this thread — the
-  // policy pill describes the next draft, and nothing may arrive under a
-  // policy the user just revoked.
-  toggleHermesAccess: () => {
-    const conv = get().selected();
-    if (!conv) return;
-    const blocking = !conv.hermesBlocked;
-    const cancelling = blocking && draftTimer !== null && draftingConvId === conv.id;
-    if (cancelling) {
-      window.clearTimeout(draftTimer!);
-      draftTimer = null;
-      draftingConvId = null;
-    }
-    set((s) => ({
-      ...(cancelling ? { drafting: false } : {}),
-      conversations: s.conversations.map((c) => {
-        if (c.id !== conv.id) return c;
-        const draft =
-          cancelling && c.draft.status === "requested"
-            ? { ...c.draft, status: "not_started" as const }
-            : c.draft;
-        return { ...c, hermesBlocked: blocking, draft };
-      }),
-      audit: pushAudit(
-        s.audit,
-        {
-          actor: "human",
-          surface: "ui",
-          action: blocking ? "hermes.thread_block" : "hermes.thread_allow",
-          resource: conv.id,
-          result: "allowed",
-        },
-        s.now,
-      ),
-    }));
-  },
-
   requestDraft: () => {
     const conv = get().selected();
     if (!conv) return;
-    // Thread-level default-on sharing (Elijah, 2026-07-03 v2): asking for a
-    // draft IS the share — Hermes reads the full thread unless this thread is
-    // blocked. The share is audited once, when it first happens.
-    const sharesNow = !conv.hermesBlocked && !conv.threadShared;
-    // lifecycle: requested -> (mock latency) -> angles_ready -> pick 1/2/3
+    // Drafting means Hermes reads the thread — full stop, no badges, no
+    // switches (Elijah v4). lifecycle: requested → angles_ready → pick 1/2/3.
     // Open the sheet too: below xl the side panel doesn't exist, and a state
     // mutation with no visible feedback is a contract violation.
-    set((s) => {
-      let audit = pushAudit(
+    set((s) => ({
+      drafting: true,
+      draftSheetOpen: true,
+      conversations: s.conversations.map((c) =>
+        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
+      ),
+      audit: pushAudit(
         s.audit,
         { actor: "hermes", surface: "ui", action: "draft.request", resource: conv.id, result: "allowed" },
         s.now,
-      );
-      if (sharesNow) {
-        audit = pushAudit(
-          audit,
-          { actor: "human", surface: "ui", action: "hermes.thread_share", resource: conv.id, result: "allowed" },
-          s.now,
-        );
-      }
-      return {
-        drafting: true,
-        draftSheetOpen: true,
-        conversations: s.conversations.map((c) =>
-          c.id === conv.id
-            ? {
-                ...c,
-                threadShared: c.threadShared || !c.hermesBlocked,
-                draft: { ...c.draft, status: "requested" },
-              }
-            : c,
-        ),
-        audit,
-      };
-    });
+      ),
+    }));
 
-    // Provenance is captured AT REQUEST TIME — this is what Hermes actually saw.
-    const policyAtRequest: "metadata_only" | "full_thread" = conv.hermesBlocked
-      ? "metadata_only"
-      : "full_thread";
-    draftingConvId = conv.id;
-    draftTimer = window.setTimeout(() => {
-      draftTimer = null;
-      draftingConvId = null;
+    window.setTimeout(() => {
       set((s) => ({
         drafting: false,
         conversations: s.conversations.map((c) => {
@@ -313,16 +239,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
             (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: set[tone] }),
           );
-          return {
-            ...c,
-            draft: {
-              ...c.draft,
-              bodyPolicy: policyAtRequest,
-              status: "angles_ready",
-              angles,
-              anglesFrom: policyAtRequest,
-            },
-          };
+          return { ...c, draft: { ...c.draft, status: "angles_ready", angles } };
         }),
         audit: pushAudit(
           s.audit,
@@ -350,7 +267,6 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             ...c.draft,
             status: "generated",
             angles: undefined,
-            anglesFrom: undefined,
             versions: [
               ...c.draft.versions,
               {
@@ -358,7 +274,6 @@ export const useInboxStore = create<InboxState>((set, get) => ({
                 createdAt: new Date(s.now).toISOString(),
                 instructions: `Angle: ${angle.tone}`,
                 text: angle.text,
-                from: c.draft.anglesFrom ?? "full_thread",
               },
             ],
             activeVersionId: vid,
@@ -373,48 +288,82 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
   },
 
-  regenerateDraft: (reason) => {
+  // The drafting studio: one chat turn = one instruction = one NEW version.
+  // The chat log IS the instruction record (no meta rows on the card).
+  iterateDraft: (instruction) => {
     const conv = get().selected();
-    if (!conv || conv.draft.versions.length === 0) return;
-    // N2: every draft mutation opens its feedback surface (sheet below lg;
-    // harmless at lg+ where the sheet container isn't rendered).
-    set({ drafting: true, draftSheetOpen: true });
+    const text = instruction.trim();
+    if (!conv || !text) return;
+    const base = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    if (!base) return;
+    const userMsg: DraftChatMsg = { id: `${conv.id}ch${(conv.draft.chat?.length ?? 0) + 1}`, role: "user", text };
+    // N2 class: every draft mutation opens its feedback surface (sheet <xl).
+    set((s) => ({
+      drafting: true,
+      draftSheetOpen: true,
+      conversations: s.conversations.map((c) =>
+        c.id === conv.id
+          ? { ...c, draft: { ...c.draft, chat: [...(c.draft.chat ?? []), userMsg] } }
+          : c,
+      ),
+    }));
     window.setTimeout(() => {
       set((s) => ({
         drafting: false,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
-          const last = c.draft.versions[c.draft.versions.length - 1];
           const vid = `${c.id}d${c.draft.versions.length + 1}`;
+          const { text: newText, ack } = applyInstruction(base.text, text);
+          const hermesMsg: DraftChatMsg = {
+            id: `${c.id}ch${(c.draft.chat?.length ?? 0) + 1}`,
+            role: "hermes",
+            text: ack,
+            versionId: vid,
+          };
           return {
             ...c,
             draft: {
               ...c.draft,
-              status: "generated",
+              status: "iterated",
+              chat: [...(c.draft.chat ?? []), hermesMsg],
               versions: [
                 ...c.draft.versions,
-                {
-                  id: vid,
-                  createdAt: new Date(s.now).toISOString(),
-                  instructions: last.instructions,
-                  reason,
-                  text: regenerate(last.text, reason),
-                  // A regen transforms the prior text, so it inherits that
-                  // text's provenance — Hermes saw nothing new.
-                  from: last.from,
-                },
+                { id: vid, createdAt: new Date(s.now).toISOString(), instructions: text, text: newText },
               ],
               activeVersionId: vid,
             },
           };
         }),
+        audit: pushAudit(
+          s.audit,
+          { actor: "hermes", surface: "ui", action: "draft.iterate", resource: conv.id, result: "allowed" },
+          s.now,
+        ),
       }));
     }, 520);
   },
 
-  applyTone: (toneId) => {
-    const label = TONE_CONTROLS.find((t) => t.id === toneId)?.label ?? toneId;
-    get().regenerateDraft(label);
+  // `r`: focus the studio chat input — refinement always carries intent
+  // (typed words or a quick chip); there is no bare Regenerate anywhere.
+  focusStudio: () => {
+    const conv = get().selected();
+    if (!conv || conv.draft.versions.length === 0) return;
+    set((s) => ({
+      draftSheetOpen: true, // below xl the studio lives in the sheet
+      mobilePane: "thread",
+      studioFocusTick: s.studioFocusTick + 1,
+    }));
+  },
+
+  // Stepper navigation — any version can be inspected and added to chat.
+  setActiveVersion: (id) => {
+    const conv = get().selected();
+    if (!conv || !conv.draft.versions.some((v) => v.id === id)) return;
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === conv.id ? { ...c, draft: { ...c.draft, activeVersionId: id } } : c,
+      ),
+    }));
   },
 
   // "Add to chat": the draft becomes a PREFILL in the composer — the one
@@ -600,11 +549,42 @@ function anglesFor(conv: Conversation): AngleSet {
   return (lastIncoming && ANGLES_BY_BODY.get(lastIncoming.body)) ?? ANGLE_FALLBACK;
 }
 
-function regenerate(text: string, reason: string): string {
-  const r = reason.toLowerCase();
-  if (r.includes("short")) return text.split(". ").slice(0, 1).join(". ") + ".";
-  if (r.includes("warm")) return `Really appreciate you reaching out. ${text}`;
-  if (r.includes("direct")) return text.replace(/\b(really|genuinely|so much|great)\b/gi, "").replace(/\s+/g, " ").trim();
-  if (r.includes("context")) return `${text} For context, I'm mid-build on the inbox this week, so timing matters.`;
-  return `${text}`;
+// Applies a studio-chat instruction to the active draft VISIBLY — the change
+// must be obvious in the new version, and the ack reads like Hermes talking.
+function applyInstruction(text: string, instruction: string): { text: string; ack: string } {
+  const r = instruction.toLowerCase();
+  const sentences = text.split(/(?<=[.!?])\s+/);
+
+  if (/(warm|friendl|soft)/.test(r)) {
+    const t = `Really glad you reached out — ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+    return { text: t, ack: "Warmed it up." };
+  }
+  if (/(short|brief|tight|trim|concise)/.test(r)) {
+    return { text: sentences[0] ?? text, ack: "Tightened it to the essentials." };
+  }
+  if (/(direct|blunt|straight)/.test(r)) {
+    const t = text
+      .replace(/\b(really|genuinely|honestly|so much|great|happy to|of course,?)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .replace(/\s+([,.!?])/g, "$1")
+      .trim();
+    return { text: t, ack: "Made it more direct." };
+  }
+  const addMatch = instruction.match(/^\s*(?:add|mention|include|note)\s+(?:that\s+)?(.+)$/i);
+  if (addMatch) {
+    const detail = addMatch[1].replace(/\.$/, "");
+    const t = `${text} One more thing — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`;
+    return { text: t, ack: "Added that in." };
+  }
+  if (/(voice|polish|keep)/.test(r)) {
+    return { text, ack: "Kept your voice — just smoothed the edges." };
+  }
+  if (/(another|different|again|new take|retry)/.test(r)) {
+    // Answer-first restructure: lead with the closing commitment.
+    const t = sentences.length > 1 ? [sentences[sentences.length - 1], ...sentences.slice(0, -1)].join(" ") : text;
+    return { text: t, ack: "Here's another take — leads with the point." };
+  }
+  // Default: answer-first restructure (visible, plausible interpretation).
+  const t = sentences.length > 1 ? [sentences[sentences.length - 1], ...sentences.slice(0, -1)].join(" ") : `${text} Happy to adjust further.`;
+  return { text: t, ack: "Reworked it — see what you think." };
 }

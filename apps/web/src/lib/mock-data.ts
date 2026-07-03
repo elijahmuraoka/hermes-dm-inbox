@@ -55,8 +55,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "high",
     unread: true,
     lastActivity: iso(7),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "Direct question about Thursday; likely needs a reply today.",
     messages: [
       {
@@ -78,7 +76,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -91,8 +88,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: true,
     lastActivity: iso(52),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "Warm intro request; a short yes/no keeps momentum.",
     messages: [
       {
@@ -106,7 +101,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -119,8 +113,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(96),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "Follow-up on the API question you left open two days ago.",
     messages: [
       {
@@ -134,7 +126,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -147,8 +138,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(140),
-    threadShared: true,
-    hermesBlocked: false,
     hermesSuggestion: "Draft ready for your review — declines politely, keeps the door open.",
     messages: [
       {
@@ -162,14 +151,12 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "generated",
-      bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c4d1",
       versions: [
         {
           id: "c4d1",
           createdAt: iso(120),
-          from: "full_thread",
           instructions: "Decline for now, warm, leave the door open for later.",
           text: "Really appreciate you thinking of me, Wei — and congrats on getting the round moving. I'm heads-down on a build right now so I can't take on an advising role this quarter, but I'd love to stay in touch and reconnect once you're past the raise. Keep me posted on how it comes together.",
         },
@@ -184,8 +171,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(210),
-    threadShared: true,
-    hermesBlocked: false,
     hermesSuggestion: "Casual thanks reply drafted; low stakes, send when convenient.",
     messages: [
       {
@@ -198,26 +183,26 @@ const BASE_CONVERSATIONS: Conversation[] = [
       },
     ],
     draft: {
-      status: "generated",
-      bodyPolicy: "full_thread",
+      status: "iterated",
       modelLocality: "mock",
       activeVersionId: "c5d2",
       versions: [
         {
           id: "c5d1",
           createdAt: iso(200),
-          from: "full_thread",
           instructions: "Warm, brief congratulations.",
           text: "That's fantastic news — not surprised at all. Go get the final round!",
         },
         {
           id: "c5d2",
           createdAt: iso(196),
-          from: "full_thread",
-          instructions: "Warm, brief congratulations.",
-          reason: "Make it a touch more personal.",
+          instructions: "Make it a touch more personal.",
           text: "That's fantastic — genuinely not surprised, you were the obvious pick. Go take the final round. Rooting for you.",
         },
+      ],
+      chat: [
+        { id: "c5ch1", role: "user", text: "Make it a touch more personal." },
+        { id: "c5ch2", role: "hermes", text: "Here's a more personal take.", versionId: "c5d2" },
       ],
     },
   },
@@ -229,8 +214,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "normal",
     unread: false,
     lastActivity: iso(1500),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "You replied yesterday; waiting on their confirmation.",
     messages: [
       {
@@ -244,7 +227,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -257,8 +239,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(2880),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "They owe you the one-pager — nothing for you to do until it lands.",
     messages: [
       {
@@ -272,7 +252,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -285,8 +264,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(320),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "Informational; no reply expected.",
     messages: [
       {
@@ -300,7 +277,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -313,8 +289,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(600),
-    threadShared: false,
-    hermesBlocked: false,
     hermesSuggestion: "Shared a link you might find useful; no action needed.",
     messages: [
       {
@@ -328,7 +302,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      bodyPolicy: "metadata_only",
       modelLocality: "mock",
       versions: [],
     },
@@ -341,8 +314,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     urgency: "low",
     unread: false,
     lastActivity: iso(4300),
-    threadShared: true,
-    hermesBlocked: false,
     hermesSuggestion: "Resolved — you confirmed the details.",
     messages: [
       {
@@ -357,14 +328,12 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "sent_mock",
-      bodyPolicy: "full_thread",
       modelLocality: "mock",
       activeVersionId: "c10d1",
       versions: [
         {
           id: "c10d1",
           createdAt: iso(4320),
-          from: "full_thread",
           instructions: "Confirm and close out warmly.",
           text: "Perfect, see you then.",
         },
@@ -578,8 +547,6 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     urgency: bucket === "needs" && i % 9 === 0 ? "high" : i % 4 === 0 ? "low" : "normal",
     unread: bucket === "needs" && i % 3 === 0,
     lastActivity: iso(minAgo),
-    threadShared: drafted, // generated drafts came from a thread share (default-on)
-    hermesBlocked: false,
     hermesSuggestion: spec.suggestion,
     messages: [
       {
@@ -594,14 +561,12 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     draft: drafted
       ? {
           status: "generated" as const,
-          bodyPolicy: "full_thread" as const,
           modelLocality: "mock" as const,
           activeVersionId: `cg${i}d1`,
           versions: [
             {
               id: `cg${i}d1`,
               createdAt: iso(minAgo - 10),
-          from: "full_thread",
               instructions: "Draft a reply in my voice.",
               text: GEN_DRAFT_TEXT,
             },
@@ -609,7 +574,6 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
         }
       : {
           status: "not_started" as const,
-          bodyPolicy: "metadata_only" as const,
           modelLocality: "mock" as const,
           versions: [],
         },
@@ -620,15 +584,6 @@ Object.assign(PEOPLE, GENERATED_PEOPLE);
 export const CONVERSATIONS: Conversation[] = [...BASE_CONVERSATIONS, ...GENERATED];
 
 export const AUDIT_EVENTS: AuditEvent[] = [
-  {
-    id: "a2",
-    timestamp: iso(119),
-    actor: "human",
-    surface: "ui",
-    action: "hermes.thread_share",
-    resource: "c4",
-    result: "allowed",
-  },
   {
     id: "a3",
     timestamp: iso(118),

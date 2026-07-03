@@ -50,13 +50,11 @@
   --urgency-high: oklch(0.58 0.19 27);
   --status-unread: oklch(0.55 0.15 235);
 
-  /* The one privacy signal: thread shared into Hermes' context (amber).
-     L 0.48: AA for small text on near-white incl. the 12% tint chip bg (§7:
-     privacy legibility beats aesthetics). */
-  --priv-shared: oklch(0.48 0.15 60);
+  /* Hermes's PRESENCE color (v4 reframe — amber marks Hermes surfaces, not
+     "what Hermes sees"). L 0.48: AA for small text on near-white. */
+  --hermes: oklch(0.48 0.15 60);
 
   --glow-primary: oklch(0.55 0.15 235 / 22%);
-  --agent-label: oklch(0.46 0.15 250); /* darker so small-caps HERMES passes AA on light */
 }
 
 /* ───────────────────────── Dark (primary, "operator") ───────────────────────── */
@@ -71,7 +69,6 @@
   --muted-foreground: oklch(0.74 0.016 255); /* AA on near-black, incl. 10–11px */
   --primary: oklch(0.78 0.13 230); /* signature cyan glow — the ONE accent */
   --primary-foreground: oklch(0.16 0.02 250);
-  --agent-label: oklch(0.82 0.12 232); /* bright cyan; AA on near-black */
   --secondary: oklch(0.24 0.014 260);
   --secondary-foreground: oklch(0.95 0.006 250);
   --accent: oklch(0.3 0.02 250);
@@ -99,7 +96,7 @@
   --urgency-high: oklch(0.68 0.19 25);
   --status-unread: oklch(0.78 0.13 230);
 
-  --priv-shared: oklch(0.8 0.14 70); /* amber, AA on near-black */
+  --hermes: oklch(0.8 0.14 70); /* presence amber, AA on near-black */
 
   --glow-primary: oklch(0.78 0.13 230 / 28%);
 }
@@ -151,7 +148,7 @@
   --color-urgency-high: var(--urgency-high);
   --color-status-unread: var(--status-unread);
 
-  --color-priv-shared: var(--priv-shared);
+  --color-hermes: var(--hermes);
 }
 
 @layer base {

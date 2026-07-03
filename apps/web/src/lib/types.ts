@@ -1,9 +1,8 @@
 // Domain types for the inbox slice. Mirrors the spec's index-store vocabulary.
-// NOTE (Elijah, 2026-07-03, v2): bodies are ALWAYS visible to the human — this
-// is a single-user local app. Sharing with Hermes is THREAD-level and default-on
-// for drafting: pressing `d` shares the full thread into Hermes' context (that's
-// the point of asking it to draft). A per-thread opt-out (`hermesBlocked`) keeps
-// Hermes at metadata-only. BodyPolicy describes what Hermes sees.
+// NOTE (Elijah, 2026-07-03, v4): single-user local app — bodies are always
+// visible to the human, and drafting means Hermes reads the thread, full stop.
+// No share badges, no per-thread block switch (consent theater collapsed);
+// amber is Hermes's PRESENCE color, not a "what Hermes sees" signal.
 
 export type SourceId = "imessage" | "linkedin" | "x";
 
@@ -11,21 +10,19 @@ export type Bucket = "needs" | "drafted" | "waiting" | "fyi" | "done";
 
 export type Urgency = "high" | "normal" | "low";
 
-// Composer-first lifecycle (Elijah, 2026-07-03 v3): drafts are PREFILLS.
-// "Add to chat" drops the text into the composer — the one editing surface —
-// and sending from there is the intent gesture (approve-intent ceremony
-// retired). v0 send is a LOCAL MOCK: no real delivery, honestly labeled.
+// Composer-first lifecycle (Elijah, 2026-07-03 v3+v4): drafts are PREFILLS,
+// iterated conversationally in the drafting studio. "Add to chat" drops the
+// text into the composer — the one editing surface — and sending from there
+// is the intent gesture. (Code-level truth: v0 send is a local mock append.)
 export type DraftStatus =
   | "not_started"
   | "requested"
   | "angles_ready" // three angled candidates await a 1/2/3 pick
-  | "generated" // picked angle, read-only card in the panel
+  | "generated" // picked angle, read-only card in the studio
+  | "iterated" // refined via studio chat; versions.length > 1
   | "added_to_chat" // prefilled into the composer
   | "edited" // composer text diverged from the Hermes draft
   | "sent_mock"; // sent from the composer (local mock append)
-
-// What Hermes sees when it drafts: metadata, or the full thread (default on `d`).
-export type BodyPolicy = "metadata_only" | "full_thread";
 
 export type DraftAngleTone = "warm" | "direct" | "brief";
 
@@ -55,20 +52,25 @@ export interface DraftAngle {
 export interface DraftVersion {
   id: string;
   createdAt: string;
-  instructions: string;
+  instructions: string; // the studio-chat instruction that produced this version
   text: string;
-  from: BodyPolicy; // provenance: what Hermes actually saw when THIS text was made
-  reason?: string; // regeneration reason
+}
+
+/** One turn in the drafting studio's chat — the instruction record. */
+export interface DraftChatMsg {
+  id: string;
+  role: "user" | "hermes";
+  text: string;
+  versionId?: string; // a hermes turn points at the version it produced
 }
 
 export interface Draft {
   status: DraftStatus;
-  bodyPolicy: BodyPolicy;
   modelLocality: "mock" | "local" | "cloud";
   angles?: DraftAngle[]; // present while status === "angles_ready"
-  anglesFrom?: BodyPolicy; // provenance of the pending candidates
   versions: DraftVersion[];
   activeVersionId?: string;
+  chat?: DraftChatMsg[]; // the studio conversation (instruction history)
 }
 
 export interface Conversation {
@@ -80,8 +82,6 @@ export interface Conversation {
   unread: boolean;
   lastActivity: string; // ISO
   hermesSuggestion?: string; // one-line triage rationale
-  threadShared: boolean; // thread bodies have entered Hermes' context (via `d`)
-  hermesBlocked: boolean; // per-thread opt-out: Hermes stays metadata-only here
   messages: Message[];
   draft: Draft;
 }

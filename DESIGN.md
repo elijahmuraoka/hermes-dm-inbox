@@ -6,8 +6,8 @@ anti-slop canon is the floor beneath it, this file wins on conflict.
 
 > **Stance:** a dark-operator DM *cockpit* — dense, calm, instant, keyboard-first. Closer to Superhuman /
 > Linear than a CRUD admin panel. Dark is the primary theme; a crisp light theme ships alongside it via a
-> toggle that matches the Tomoji main app. The one thing that must feel unmistakable is **when a body has
-> been shared into Hermes' context** — the single privacy signal (see §3).
+> toggle that matches the Tomoji main app. The one thing that must feel unmistakable is **Hermes's
+> presence** — amber marks where the agent is working (see §3).
 
 ---
 
@@ -100,20 +100,15 @@ Define once, both themes. Components reference these, never raw colors.
 | `--bucket-done`   | Done | green | green |
 | `--urgency-high`  | urgent | `--destructive` | `--destructive` |
 | `--status-unread` | unread dot/weight | `--primary` | `--primary` |
-| **Sharing gate (the one privacy signal) ↓** | | | |
-| `--priv-shared`   | thread is in Hermes' context | amber "Hermes sees this thread" chip + row tick | same |
+| **Hermes presence ↓** | | | |
+| `--hermes` | amber — marks Hermes surfaces (mark chip, studio, HERMES label) | oklch(0.8 0.14 70) | oklch(0.48 0.15 60) |
 
-> **DECISION v2 — Elijah, 2026-07-03 (supersedes per-message sharing).** Sharing is **thread-level and
-> default-on for drafting**: pressing `d` means Hermes reads the full thread — that's the point of asking it
-> to draft. No per-message share links, no `⇧V`/`z` machinery. The amber signal stays (it's the identity
-> element): an **"Hermes sees this thread" chip** in the thread strip + the **amber row tick**, with a
-> **per-thread opt-out toggle** (Block/Allow, audited) that pins drafts to metadata-only.
-> (v1 — same day — killed redaction-from-the-human: bodies are always fully visible to you; no blur, no
-> reveal step, no human-view audit.)
-
-**The sharing model in one line:** *metadata-only until you ask for a draft; asking = the thread is shared.*
-The amber treatment must stay legible at a glance (chip + tick + the live body-policy pill in the draft
-panel), while unshared threads carry **zero privacy chrome**.
+> **DECISION v4 — Elijah, 2026-07-03 (supersedes v2's sharing apparatus).** The consent theater is
+> collapsed: **no "Hermes sees this thread" chip, no Block/Allow switch, no share ticks, no body-policy
+> pill, no provenance rows.** Your agent reading your thread when you ask it to draft needs no badge or
+> off-switch — that's what asking means. **Amber is REFRAMED as Hermes's presence color**: it marks where
+> the agent is (the wing chip, the studio chat, the HERMES strip label) — never "what Hermes sees".
+> (Still standing from v1/v2: bodies always visible to the human; drafting reads the thread, full stop.)
 
 ---
 
@@ -134,8 +129,8 @@ Full target (3-pane) — Phase 0 may ship 2-col + modal palette (contract-approv
 - **Density = Superhuman:** conversation row is **single-line, 40px** (locked "ledger" treatment, §5), 4px
   spacing base, hairline row separators (alpha border), no heavy card chrome per row.
 - Selected row: **full-row `--primary` wash (10%) + 1px inset primary ring** — quiet but unambiguous.
-- **Edge language (the identity move):** the row's left edge carries meaning — **cyan = where you are**
-  (selection), **amber = what Hermes sees** (a shared body in the thread, glowing 3px tick).
+- **Edge language:** the row's left edge carries selection — **cyan = where you are** (full-row wash +
+  inset ring). (v4: the amber share tick is gone; amber now lives on Hermes surfaces, not rows.)
 - Left rail is quiet (Tomoji `--sidebar*`); the **list is the workhorse**, the thread/draft the focus.
 - **No layout shift** while drafting/loading (contract perf rule) — reserve space; skeletons match final metrics.
 
@@ -147,25 +142,27 @@ Each ships with **all states** — default · hover · focus-visible · selected
 · disabled. States are first-class (canon: missing states = defect).
 
 1. **ConversationRow** — **LOCKED: the "ledger" treatment** (bake-off winner, Elijah 2026-07-03; "edge" and
-   "card" variants deleted). Single-line 40px: unread dot slot · **brand source icon** (inline SVG, no mono
-   text tags) · fixed-width name (148px) · urgency/draft dots · flex preview · tabular time. Selection =
-   full-row primary wash + inset ring; **thread-shared = glowing amber tick on the left edge** (no avatar,
-   no per-row chips). `j/k` moves selection, `Enter` opens.
+   "card" variants deleted). Single-line 2.5rem: unread dot slot · **brand source icon** (inline SVG, no
+   mono text tags) · fixed-width name (9.25rem) · urgency/draft dots · flex preview · tabular time.
+   Selection = full-row primary wash + inset ring (no avatar, no per-row chips, no share ticks — v4).
+   `j/k` moves selection, `Enter` opens.
 2. **BucketNav** — buckets (with a one-line semantics `desc` under the list header: whose court is the ball
    in?) + sources with brand icons, live counts (tabular); active bucket uses `--primary` edge. Lives in the
    **side rail from `md` up**; below `md` it's a **hamburger → left drawer** (no top chip bar at tablet
    widths — Elijah's call). `g i/g d/g a` unchanged.
-3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message chrome).
-   The Hermes strip carries the thread-level state: amber **"Hermes sees this thread"** chip once shared,
-   **Block/Allow** opt-out toggle, nothing when unshared.
-4. **HermesDraftPanel** — lifecycle (`requested→angles_ready→generated→added_to_chat→edited→sent_mock`;
-   the approve-intent ceremony is RETIRED — sending from the composer is the intent gesture, audited as
-   `draft.sent_mock`). On `d` Hermes returns **three angled candidates (1 warm · 2 direct · 3 brief)**
-   picked by number key; the picked card is **read-only** with **"Add to chat" as the primary action**
-   (`e`) — drafts are PREFILLS, the composer is the one editing surface. Live **body-policy pill describes
-   only the NEXT draft**; candidates and versions carry **"Drafted from:" provenance**. Blocking a thread
-   **cancels any in-flight generation**. Tone controls + regenerate-with-reason operate on the card. Side
-   rail at `xl+`, bottom sheet below.
+3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message or
+   thread-level privacy chrome — v4). The Hermes strip carries only the triage rationale, with the HERMES
+   label in presence amber.
+4. **HermesDraftPanel = the DRAFTING STUDIO** (v4) — lifecycle
+   (`requested→angles_ready→generated→iterated(n)→added_to_chat→edited→sent`). On `d` Hermes returns
+   **three angled candidates (1 warm · 2 direct · 3 brief)** picked by number key. The picked card is
+   **read-only** at the top; under it, a **lightweight chat with Hermes**: freeform input ("tell Hermes
+   what to change"), each Hermes reply = a **new version on the navigable stepper** (v1/v2/v3; hermes
+   turns link to their version). Tone chips are **quick-inserts into the chat input**, not separate
+   controls. No Instructions/Model/provenance meta rows — **the chat IS the instruction record**.
+   **Every control carries intent: there is no bare Regenerate** — re-generation happens only through the
+   chat with words attached (`r` focuses the chat input). "Add to chat" (`e`) stays the primary action;
+   the composer remains the only send surface. Side rail at `xl+`, bottom sheet below.
 4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
    button, Send. `c` or `Enter`-in-thread focuses it; `⌘Enter` sends; `Esc` returns to list scope.
    Sending appends the outgoing message and moves the thread to Waiting on them — **presented exactly as
@@ -213,13 +210,12 @@ A slice is done only when, on a **real running app with mock data**, rendered an
 `375 · 768 · 1024 · 1440 · 1920` in **both themes**:
 
 1. Fast inbox list, keyboard nav (`j/k`, `Enter`, `u`), selected-row treatment correct.
-2. Open a thread; **every body is fully readable**; unshared threads carry **zero privacy chrome**.
-3. Ask for a draft (`d`): the thread flips to the **amber "Hermes sees this thread"** state (chip + row
-   tick), instantly legible without reading labels; the **Block/Allow** opt-out works and is audited.
+2. Open a thread; **every body is fully readable**; threads carry **zero privacy chrome** (v4).
+3. Amber appears ONLY as Hermes presence (mark chip, studio, HERMES label) — never as a share signal.
 4. `⌘K` palette opens <100ms, categorized, keyboard-only usable; `?` shows shortcuts.
-5. `d` returns **three angles**; `1/2/3` picks one; `e` adds it to the composer; edit there; `⌘Enter`
-   sends (the message appears in-thread as a real send — no meta labels); lifecycle + live body-policy
-   pill (**Full thread** default, **Metadata only** when blocked) + "Drafted from:" provenance visible.
+5. `d` returns **three angles**; `1/2/3` picks one; the studio chat refines it (each instruction → a new
+   stepper version, visibly changed); `e` adds the active version to the composer; edit there; `⌘Enter`
+   sends (appears in-thread as a real send — no meta labels).
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.

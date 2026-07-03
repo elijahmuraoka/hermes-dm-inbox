@@ -31,12 +31,12 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Hermes & composer",
     rows: [
-      ["d", "Draft reply — shares this thread with Hermes"],
+      ["d", "Draft reply with Hermes"],
       ["1 2 3", "Pick a draft angle (warm / direct / brief)"],
       ["e", "Add picked draft to chat"],
       ["c", "Focus composer"],
       ["⌘⏎", "Send message"],
-      ["r", "Regenerate (draft focused)"],
+      ["r", "Refine draft (focus studio chat)"],
       ["Esc", "Leave composer / close modal"],
     ],
   },

@@ -13,14 +13,12 @@ interface RowProps {
 }
 
 // LOCKED (§8 variant bake-off, Elijah 2026-07-03): the "ledger" treatment.
-// Single-line 40px max density. The edge language is the identity move:
-//   cyan  = where you are  (selection: full-row primary wash + inset ring)
-//   amber = what Hermes sees (thread shared: glowing amber tick on the row edge)
-// Losing variants ("edge", "card") deleted from the codebase.
+// Single-line max density; selection = full-row primary wash + inset ring.
+// (v4: the amber share tick is gone — consent theater collapsed. Amber is
+// Hermes's presence color on Hermes surfaces, not a row signal.)
 function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowProps) {
   const person = PEOPLE[c.personId];
   const lastMsg = c.messages[c.messages.length - 1];
-  const shared = c.threadShared;
   const drafted = c.draft.status !== "not_started";
 
   return (
@@ -36,24 +34,6 @@ function ConversationRowImpl({ conversation: c, selected, now, onClick }: RowPro
           : "hover:bg-accent/25",
       )}
     >
-      {/* shared = amber tick on the row edge — the one original signal, made loud.
-          Blocked-after-share: muted tick, no glow — the history stands, the door is shut. */}
-      {shared && (
-        <span
-          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
-          style={
-            c.hermesBlocked
-              ? { background: "var(--muted-foreground)", opacity: 0.55 }
-              : { background: "var(--priv-shared)", boxShadow: "0 0 8px var(--priv-shared)" }
-          }
-          title={
-            c.hermesBlocked
-              ? "This thread was shared with Hermes; Hermes is now blocked here"
-              : "This thread is shared with Hermes"
-          }
-        />
-      )}
-
       <span className="flex w-2 shrink-0 justify-center">
         {c.unread && (
           <span className="size-1.5 rounded-full" style={{ background: "var(--status-unread)" }} />

@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Search,
   SendHorizontal,
-  Share2,
 } from "lucide-react";
 
 type Scope = "global" | "selected" | "thread" | "source";
@@ -154,19 +153,6 @@ export function CommandPalette() {
         run: withClose(() => sendMock()),
         disabled: !selected || !composerText.trim(),
       },
-      // Privacy — the thread-level gate. Drafting shares the thread by default;
-      // this is the per-thread opt-out (and its undo).
-      {
-        id: "priv-toggle",
-        label: selected?.hermesBlocked
-          ? "Allow Hermes to read this thread"
-          : "Block Hermes from this thread",
-        group: "Privacy",
-        scope: "thread",
-        icon: Share2,
-        run: withClose(() => useInboxStore.getState().toggleHermesAccess()),
-        disabled: !selected,
-      },
       // Help
       {
         id: "help-shortcuts",
@@ -204,7 +190,7 @@ export function CommandPalette() {
   }, [selected, composerText, setBucket, setSourceFilter, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
-    const order = ["Navigate", "Sync", "Search", "Triage", "Draft", "Privacy", "Dev"];
+    const order = ["Navigate", "Search", "Triage", "Draft", "Dev"];
     const byGroup = new Map<string, Cmd[]>();
     for (const c of commands) {
       if (!byGroup.has(c.group)) byGroup.set(c.group, []);

@@ -5,7 +5,7 @@ import { PEOPLE } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { cn, relTime } from "@/lib/utils";
 import { SourceIcon } from "@/components/SourceIcon";
-import { ChevronLeft, Paperclip, SendHorizontal, Share2, ShieldOff } from "lucide-react";
+import { ChevronLeft, Paperclip, SendHorizontal } from "lucide-react";
 import { HermesMark } from "@/components/HermesMark";
 
 export function Thread({ conversation: c }: { conversation: Conversation }) {
@@ -66,25 +66,18 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
         </button>
       </div>
 
-      {/* hermes strip: triage rationale + the thread-level share state */}
-      {(c.hermesSuggestion || c.threadShared || c.hermesBlocked) && (
+      {/* hermes strip: triage rationale. Amber = Hermes's presence color (v4). */}
+      {c.hermesSuggestion && (
         <div className="flex items-center gap-2 border-b border-border bg-muted/25 px-4 py-2">
-          {c.hermesSuggestion && (
-            <>
-              <span
-                className="mt-px shrink-0 font-mono text-[0.59375rem] font-semibold uppercase tracking-wider"
-                style={{ color: "var(--agent-label)" }}
-              >
-                Hermes
-              </span>
-              <p className="min-w-0 truncate text-[0.75rem] leading-snug text-muted-foreground">
-                {c.hermesSuggestion}
-              </p>
-            </>
-          )}
-          <span className="ml-auto shrink-0">
-            <ThreadShareState conversation={c} />
+          <span
+            className="mt-px shrink-0 font-mono text-[0.59375rem] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--hermes)" }}
+          >
+            Hermes
           </span>
+          <p className="min-w-0 truncate text-[0.75rem] leading-snug text-muted-foreground">
+            {c.hermesSuggestion}
+          </p>
         </div>
       )}
 
@@ -117,9 +110,13 @@ function Composer() {
   const focusTick = useInboxStore((s) => s.composerFocusTick);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // focusComposer()/addToChat() bump the tick → we take focus.
+  // focusComposer()/addToChat() bump the tick → we take focus on the NEXT
+  // frame, after the triggering keydown's default processing has finished —
+  // the hotkey character must never leak into the textarea.
   useEffect(() => {
-    if (focusTick > 0) ref.current?.focus();
+    if (focusTick === 0) return;
+    const raf = requestAnimationFrame(() => ref.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, [focusTick]);
 
   // Auto-grow up to ~6 lines, then scroll.
@@ -191,63 +188,6 @@ function Composer() {
       </div>
     </div>
   );
-}
-
-/** The thread-level sharing state — the one privacy signal, plus its opt-out. */
-function ThreadShareState({ conversation: c }: { conversation: Conversation }) {
-  const toggleHermesAccess = useInboxStore((s) => s.toggleHermesAccess);
-
-  if (c.hermesBlocked) {
-    return (
-      <span className="flex items-center gap-1.5">
-        <span
-          className="inline-flex items-center gap-1 rounded-[5px] border border-border px-1.5 py-px text-[0.65625rem] font-medium text-muted-foreground"
-          title="Hermes is blocked from this thread — drafts use metadata only"
-        >
-          <ShieldOff className="size-2.5" strokeWidth={2.5} />
-          Hermes blocked
-        </span>
-        <button
-          type="button"
-          onClick={toggleHermesAccess}
-          className="text-[0.65625rem] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-        >
-          Allow
-        </button>
-      </span>
-    );
-  }
-
-  if (c.threadShared) {
-    return (
-      <span className="flex items-center gap-1.5">
-        <span
-          role="img"
-          aria-label="Hermes sees this thread"
-          className="inline-flex items-center gap-1 rounded-[5px] border px-1.5 py-px text-[0.65625rem] font-medium"
-          style={{
-            color: "var(--priv-shared)",
-            borderColor: "color-mix(in oklch, var(--priv-shared) 45%, transparent)",
-            backgroundColor: "color-mix(in oklch, var(--priv-shared) 12%, transparent)",
-          }}
-          title="This thread's messages are in Hermes' context"
-        >
-          <Share2 className="size-2.5" strokeWidth={2.5} />
-          Hermes sees this thread
-        </span>
-        <button
-          type="button"
-          onClick={toggleHermesAccess}
-          className="text-[0.65625rem] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-          title="Block Hermes from reading this thread's bodies in future drafts"
-        >
-          Block
-        </button>
-      </span>
-    );
-  }
-
-  return null; // default state carries zero chrome
 }
 
 function MessageBubble({ message: m, now }: { message: Message; now: number }) {

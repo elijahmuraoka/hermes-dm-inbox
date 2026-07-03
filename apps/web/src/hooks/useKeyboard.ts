@@ -79,7 +79,11 @@ export function useKeyboard() {
         case "e":
           // Contextual: with a picked draft on the card, e = Add to chat
           // (the primary draft action); otherwise e = mark done.
-          if (st.selected()?.draft.status === "generated") return void st.addToChat();
+          // preventDefault ALWAYS: this hotkey can move focus into the
+          // composer, and the keystroke must never type a literal "e" there.
+          e.preventDefault();
+          if (st.selected()?.draft.status === "generated" || st.selected()?.draft.status === "iterated")
+            return void st.addToChat();
           return void st.markDone();
         case "s":
           return void st.snooze();
@@ -97,7 +101,11 @@ export function useKeyboard() {
           }
           return;
         case "r":
-          return void st.regenerateDraft("Regenerate");
+          // Refine: focus the studio chat input (no bare regenerate — every
+          // re-generation carries typed intent). preventDefault: focus moves
+          // into an input; the keystroke must not leak.
+          e.preventDefault();
+          return void st.focusStudio();
         default:
           return;
       }

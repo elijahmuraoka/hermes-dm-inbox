@@ -1,17 +1,24 @@
-import type { BodyPolicy, Conversation, DraftStatus } from "@/lib/types";
-import { useInboxStore, TONE_CONTROLS } from "@/hooks/useInboxStore";
+import { useEffect, useRef, useState } from "react";
+import type { Conversation, DraftStatus } from "@/lib/types";
+import { useInboxStore, QUICK_CHIPS } from "@/hooks/useInboxStore";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Check, RotateCw, SendHorizontal, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, RotateCw, SendHorizontal, X } from "lucide-react";
 import { HermesMark } from "@/components/HermesMark";
 
-// Rail has four segments; angles_ready sits inside "requested" territory.
+// The DRAFTING STUDIO (Elijah v4): conversational refinement. Under the draft
+// card lives a lightweight chat with Hermes — each Hermes reply is a NEW
+// version on the navigable stepper. The chat IS the instruction record (no
+// Instructions/Model meta rows). The composer remains the only send surface.
+// EVERY CONTROL CARRIES INTENT: there is no bare Regenerate — re-generation
+// happens only through the chat, with words attached (`r` focuses the input).
 const RANK: Record<DraftStatus, number> = {
   not_started: -1,
   requested: 0,
   angles_ready: 0,
   generated: 1,
+  iterated: 1,
   added_to_chat: 2,
   edited: 2,
   sent_mock: 3,
@@ -21,14 +28,10 @@ const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
   requested: "Requested",
   angles_ready: "Pick an angle",
   generated: "Generated",
+  iterated: "Iterating",
   added_to_chat: "In composer",
   edited: "Edited in composer",
   sent_mock: "Sent",
-};
-
-const POLICY_LABEL: Record<BodyPolicy, string> = {
-  metadata_only: "Metadata only",
-  full_thread: "Full thread",
 };
 
 const ANGLE_LABEL: Record<string, string> = {
@@ -47,20 +50,16 @@ export function HermesDraftPanel({
   const drafting = useInboxStore((s) => s.drafting);
   const requestDraft = useInboxStore((s) => s.requestDraft);
   const chooseAngle = useInboxStore((s) => s.chooseAngle);
-  const regenerateDraft = useInboxStore((s) => s.regenerateDraft);
-  const applyTone = useInboxStore((s) => s.applyTone);
-  const addToChat = useInboxStore((s) => s.addToChat);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
 
   const draft = c.draft;
-  const active = draft.versions.find((v) => v.id === draft.activeVersionId);
   const hasVersion = draft.versions.length > 0;
   const anglesPending = draft.status === "angles_ready" && !!draft.angles;
-  const sent = draft.status === "sent_mock";
 
-  // What Hermes sees for the NEXT draft, derived live from the thread state:
-  // full thread by default (that's the point of asking), metadata if blocked.
-  const livePolicy: BodyPolicy = c.hermesBlocked ? "metadata_only" : "full_thread";
+  const lifecycleLabel =
+    draft.status === "iterated"
+      ? `Iterating · v${draft.versions.length}`
+      : LIFECYCLE_LABEL[draft.status];
 
   return (
     <aside
@@ -70,34 +69,24 @@ export function HermesDraftPanel({
         mode === "side" ? "h-full w-[21.25rem] shrink-0 border-l border-border" : "h-full w-full",
       )}
     >
-      {/* header */}
+      {/* header — amber is Hermes's presence color (v4) */}
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3.5">
         <span
-          className="flex size-5 items-center justify-center rounded-md text-primary"
-          style={{ background: "color-mix(in oklch, var(--primary) 14%, transparent)" }}
+          className="flex size-5 items-center justify-center rounded-md"
+          style={{
+            color: "var(--hermes)",
+            background: "color-mix(in oklch, var(--hermes) 14%, transparent)",
+          }}
         >
           <HermesMark className="size-3.5" strokeWidth={2.4} />
         </span>
         <span className="text-[0.78125rem] font-semibold tracking-[-0.01em]">Hermes draft</span>
-        <span
-          className="tnum ml-auto rounded-[5px] border px-1.5 py-px font-mono text-[0.625rem]"
-          style={{
-            color: livePolicy === "full_thread" ? "var(--priv-shared)" : "var(--muted-foreground)",
-            borderColor:
-              livePolicy === "full_thread"
-                ? "color-mix(in oklch, var(--priv-shared) 45%, transparent)"
-                : "var(--border)",
-          }}
-          title={`Hermes drafts from: ${POLICY_LABEL[livePolicy]}`}
-        >
-          {POLICY_LABEL[livePolicy]}
-        </span>
         {mode === "sheet" && (
           <button
             type="button"
             onClick={() => setDraftSheet(false)}
             aria-label="Close draft panel"
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-3.5" />
           </button>
@@ -121,193 +110,268 @@ export function HermesDraftPanel({
           );
         })}
         <span className="tnum ml-2 shrink-0 font-mono text-[0.65625rem] text-muted-foreground">
-          {LIFECYCLE_LABEL[draft.status]}
+          {lifecycleLabel}
         </span>
       </div>
 
       {/* body */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3">
-        {!hasVersion && !anglesPending && !drafting && (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="max-w-[14.375rem] text-[0.78125rem] text-muted-foreground">
-              {c.hermesBlocked
-                ? "Hermes is blocked on this thread — drafts will use metadata only."
-                : "Asking for a draft shares this thread with Hermes — that's the point. You can block it per thread."}
-            </p>
-            <Button variant="primary" size="sm" onClick={() => requestDraft()} disabled={drafting}>
-              <HermesMark className="size-3.5" strokeWidth={2.2} /> Draft reply{" "}
-              <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                d
-              </Kbd>
-            </Button>
+      {!hasVersion && !anglesPending && !drafting && (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-3.5 text-center">
+          <p className="max-w-[14.375rem] text-[0.78125rem] text-muted-foreground">
+            Ask Hermes to draft a reply in your voice.
+          </p>
+          <Button variant="primary" size="sm" onClick={() => requestDraft()} disabled={drafting}>
+            <HermesMark className="size-3.5" strokeWidth={2.2} /> Draft reply{" "}
+            <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
+              d
+            </Kbd>
+          </Button>
+        </div>
+      )}
+
+      {drafting && !hasVersion && !anglesPending && (
+        <div className="space-y-2 px-3.5 py-3">
+          <div className="flex items-center gap-2 text-[0.71875rem] text-muted-foreground">
+            <RotateCw className="size-3 animate-spin" /> Hermes is drafting…
           </div>
+          <div className="skeleton h-3 w-full rounded" />
+          <div className="skeleton h-3 w-[92%] rounded" />
+          <div className="skeleton h-3 w-3/4 rounded" />
+        </div>
+      )}
+
+      {/* three angled candidates — pick with 1 / 2 / 3 */}
+      {anglesPending && !drafting && (
+        <div className="animate-stream min-h-0 flex-1 space-y-2 overflow-y-auto px-3.5 py-3">
+          <p className="text-[0.6875rem] text-muted-foreground">
+            Three angles — pick one with <Kbd>1</Kbd> <Kbd>2</Kbd> <Kbd>3</Kbd> or click:
+          </p>
+          {draft.angles!.map((a, i) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => chooseAngle((i + 1) as 1 | 2 | 3)}
+              className={cn(
+                "flex w-full items-start gap-2.5 rounded-lg border border-border bg-background/60 p-2.5 text-left",
+                "transition-colors hover:border-primary/40 hover:bg-accent/40",
+              )}
+            >
+              <Kbd className="mt-0.5">{i + 1}</Kbd>
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="text-[0.65625rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {ANGLE_LABEL[a.tone]}
+                </span>
+                <span className="text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {hasVersion && !anglesPending && <Studio conversation={c} />}
+    </aside>
+  );
+}
+
+/** Version stepper + read-only card + refinement chat + Add to chat.
+    No bare Regenerate: every re-generation goes through the chat with intent. */
+function Studio({ conversation: c }: { conversation: Conversation }) {
+  const drafting = useInboxStore((s) => s.drafting);
+  const iterateDraft = useInboxStore((s) => s.iterateDraft);
+  const setActiveVersion = useInboxStore((s) => s.setActiveVersion);
+  const addToChat = useInboxStore((s) => s.addToChat);
+  const studioFocusTick = useInboxStore((s) => s.studioFocusTick);
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  const draft = c.draft;
+  const versions = draft.versions;
+  const activeIdx = Math.max(
+    0,
+    versions.findIndex((v) => v.id === draft.activeVersionId),
+  );
+  const active = versions[activeIdx];
+  const chat = draft.chat ?? [];
+  const sent = draft.status === "sent_mock";
+
+  // `r` focuses the chat input — next frame, so the keystroke never leaks in.
+  useEffect(() => {
+    if (studioFocusTick === 0) return;
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [studioFocusTick]);
+
+  // keep the chat log pinned to the latest turn
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [chat.length, drafting]);
+
+  const submit = () => {
+    const text = input.trim();
+    if (!text || drafting) return;
+    iterateDraft(text);
+    setInput("");
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={logRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3.5 py-3">
+        {/* version stepper */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => activeIdx > 0 && setActiveVersion(versions[activeIdx - 1].id)}
+            disabled={activeIdx === 0}
+            aria-label="Previous version"
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+          <span className="tnum font-mono text-[0.65625rem] tabular-nums text-muted-foreground">
+            v{activeIdx + 1}/{versions.length}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              activeIdx < versions.length - 1 && setActiveVersion(versions[activeIdx + 1].id)
+            }
+            disabled={activeIdx === versions.length - 1}
+            aria-label="Next version"
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+          {versions.length > 1 && active && (
+            <span className="min-w-0 truncate text-[0.625rem] text-muted-foreground">
+              {active.instructions}
+            </span>
+          )}
+        </div>
+
+        {/* the active version — read-only; editing happens in the composer */}
+        <div className="rounded-lg border border-border bg-background/60 p-3 text-[0.8125rem] leading-relaxed text-foreground">
+          {active?.text}
+        </div>
+
+        {/* refinement chat — the instruction record */}
+        {chat.map((m) =>
+          m.role === "user" ? (
+            <div key={m.id} className="flex justify-end">
+              <span className="max-w-[85%] rounded-lg rounded-br-sm bg-accent/70 px-2.5 py-1.5 text-[0.75rem] leading-snug text-foreground">
+                {m.text}
+              </span>
+            </div>
+          ) : (
+            <div key={m.id} className="flex items-start gap-1.5">
+              <span
+                className="mt-1 flex size-4 shrink-0 items-center justify-center rounded"
+                style={{
+                  color: "var(--hermes)",
+                  background: "color-mix(in oklch, var(--hermes) 14%, transparent)",
+                }}
+              >
+                <HermesMark className="size-2.5" strokeWidth={2.6} />
+              </span>
+              <button
+                type="button"
+                onClick={() => m.versionId && setActiveVersion(m.versionId)}
+                className={cn(
+                  "max-w-[85%] rounded-lg rounded-bl-sm border px-2.5 py-1.5 text-left text-[0.75rem] leading-snug text-muted-foreground",
+                  m.versionId ? "hover:text-foreground" : "cursor-default",
+                )}
+                style={{ borderColor: "color-mix(in oklch, var(--hermes) 25%, transparent)" }}
+              >
+                {m.text}
+                {m.versionId && (
+                  <span className="tnum ml-1.5 font-mono text-[0.625rem] text-muted-foreground">
+                    v{versions.findIndex((v) => v.id === m.versionId) + 1}
+                  </span>
+                )}
+              </button>
+            </div>
+          ),
         )}
 
         {drafting && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[0.71875rem] text-muted-foreground">
-              <RotateCw className="size-3 animate-spin" /> Hermes is drafting…
-            </div>
-            <div className="skeleton h-3 w-full rounded" />
-            <div className="skeleton h-3 w-[92%] rounded" />
-            <div className="skeleton h-3 w-3/4 rounded" />
-          </div>
-        )}
-
-        {/* three angled candidates — pick with 1 / 2 / 3 */}
-        {anglesPending && !drafting && (
-          <div className="animate-stream space-y-2">
-            <p className="text-[0.6875rem] text-muted-foreground">
-              Three angles — pick one with <Kbd>1</Kbd> <Kbd>2</Kbd> <Kbd>3</Kbd> or click:
-            </p>
-            {/* Provenance of THESE candidates — the header pill only describes the next draft. */}
-            <p className="text-[0.65625rem] text-muted-foreground">
-              Drafted from:{" "}
-              <span
-                style={
-                  draft.anglesFrom === "full_thread" ? { color: "var(--priv-shared)" } : undefined
-                }
-              >
-                {POLICY_LABEL[draft.anglesFrom ?? "full_thread"].toLowerCase()}
-              </span>
-            </p>
-            {draft.angles!.map((a, i) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => chooseAngle((i + 1) as 1 | 2 | 3)}
-                className={cn(
-                  "flex w-full items-start gap-2.5 rounded-lg border border-border bg-background/60 p-2.5 text-left",
-                  "transition-colors hover:border-primary/40 hover:bg-accent/40",
-                )}
-              >
-                <Kbd className="mt-0.5">{i + 1}</Kbd>
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="text-[0.65625rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {ANGLE_LABEL[a.tone]}
-                  </span>
-                  <span className="text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {hasVersion && !drafting && !anglesPending && active && (
-          <div className="animate-stream space-y-3">
-            <div className="rounded-lg border border-border bg-background/60 p-3 text-[0.8125rem] leading-relaxed text-foreground">
-              {active.text}
-            </div>
-
-            <div className="space-y-1 text-[0.6875rem] text-muted-foreground">
-              <p>
-                <span className="text-muted-foreground">Instructions:</span> {active.instructions}
-              </p>
-              {active.reason && (
-                <p>
-                  <span className="text-muted-foreground">Regenerated:</span> {active.reason}
-                </p>
-              )}
-              <p>
-                <span className="text-muted-foreground">Model:</span>{" "}
-                {draft.modelLocality === "mock" ? "local" : draft.modelLocality} ·{" "}
-                <span className="text-muted-foreground">version</span>{" "}
-                {draft.versions.findIndex((v) => v.id === active.id) + 1}/{draft.versions.length}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Drafted from:</span>{" "}
-                <span
-                  style={active.from === "full_thread" ? { color: "var(--priv-shared)" } : undefined}
-                >
-                  {POLICY_LABEL[active.from].toLowerCase()}
-                </span>
-              </p>
-            </div>
-
-            {draft.versions.length > 1 && (
-              <div className="space-y-1">
-                <p className="text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
-                  Versions
-                </p>
-                {draft.versions.map((v, i) => (
-                  <div
-                    key={v.id}
-                    className={cn(
-                      "truncate rounded-md border px-2 py-1 text-[0.6875rem]",
-                      v.id === active.id
-                        ? "border-primary/30 bg-primary/5 text-foreground"
-                        : "border-border text-muted-foreground",
-                    )}
-                  >
-                    <span className="tnum mr-1.5 font-mono text-[0.625rem] text-muted-foreground">
-                      v{i + 1}
-                    </span>
-                    {v.reason ?? v.instructions}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Controls belong with the draft they control — grouped under it,
-                dead space falls below (not pinned to the panel bottom). */}
-            <div className="space-y-2.5 border-t border-border pt-3">
-              <div className="flex flex-wrap gap-1.5">
-                {TONE_CONTROLS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => applyTone(t.id)}
-                    disabled={drafting}
-                    className={cn(
-                      "rounded-full border border-border px-2 py-0.5 text-[0.6875rem] text-muted-foreground",
-                      "transition-colors hover:border-primary/30 hover:bg-accent hover:text-foreground",
-                      "disabled:opacity-40",
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => regenerateDraft("Regenerate")}
-                  disabled={drafting}
-                >
-                  <RotateCw /> Regenerate <Kbd className="ml-0.5">r</Kbd>
-                </Button>
-                {/* PRIMARY action: the draft is a prefill — editing happens in
-                    the composer, the one editing surface. Approve-intent
-                    ceremony retired; sending IS the intent gesture. */}
-                <Button
-                  variant={sent ? "secondary" : "primary"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={addToChat}
-                  disabled={drafting}
-                >
-                  {sent ? <Check /> : <SendHorizontal />}{" "}
-                  {sent ? "Sent" : "Add to chat"}{" "}
-                  <Kbd
-                    className={cn(
-                      "ml-0.5",
-                      !sent &&
-                        "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground",
-                    )}
-                  >
-                    e
-                  </Kbd>
-                </Button>
-              </div>
-              <p className="text-[0.65625rem] leading-snug text-muted-foreground">
-                This card is read-only — edit in the composer. Hermes drafts; you send.
-              </p>
-            </div>
+          <div className="flex items-center gap-2 text-[0.71875rem] text-muted-foreground">
+            <RotateCw className="size-3 animate-spin" /> Hermes is drafting…
           </div>
         )}
       </div>
-    </aside>
+
+      {/* chat input + quick chips + Add to chat */}
+      <div className="shrink-0 space-y-2 border-t border-border px-3.5 py-2.5">
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => {
+                setInput((cur) => (cur ? `${cur} ${chip.insert}` : chip.insert));
+                inputRef.current?.focus();
+              }}
+              disabled={drafting}
+              className="rounded-full border border-border px-2 py-0.5 text-[0.6875rem] text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent hover:text-foreground disabled:opacity-40"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-end gap-1.5 rounded-lg border border-border bg-card px-2 py-1 transition-colors focus-within:border-[color-mix(in_oklch,var(--hermes)_45%,transparent)]">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              } else if (e.key === "Escape") {
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder="Tell Hermes what to change…"
+            aria-label="Refine the draft"
+            className="max-h-[80px] min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[0.75rem] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!input.trim() || drafting}
+            aria-label="Send instruction to Hermes"
+            className={cn(
+              "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
+              input.trim() && !drafting
+                ? "text-[var(--hermes)] hover:bg-accent"
+                : "text-muted-foreground/50",
+            )}
+          >
+            <SendHorizontal className="size-3.5" />
+          </button>
+        </div>
+
+        <Button
+          variant={sent ? "secondary" : "primary"}
+          size="sm"
+          className="w-full"
+          onClick={addToChat}
+          disabled={drafting}
+        >
+          {sent ? <Check /> : <SendHorizontal />} {sent ? "Sent" : "Add to chat"}{" "}
+          <Kbd
+            className={cn(
+              "ml-0.5",
+              !sent &&
+                "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground",
+            )}
+          >
+            e
+          </Kbd>
+        </Button>
+      </div>
+    </div>
   );
 }
