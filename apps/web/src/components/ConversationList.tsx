@@ -1,0 +1,59 @@
+import { useMemo } from "react";
+import { useInboxStore } from "@/hooks/useInboxStore";
+import { BUCKET_META } from "@/lib/types";
+import { ConversationRow } from "@/components/ConversationRow";
+import { EmptyBucket, ErrorState, ListSkeleton } from "@/components/StatusStates";
+
+export function ConversationList() {
+  const loadState = useInboxStore((s) => s.loadState);
+  const conversations = useInboxStore((s) => s.conversations);
+  const activeBucket = useInboxStore((s) => s.activeBucket);
+  const sourceFilter = useInboxStore((s) => s.sourceFilter);
+  const selectedId = useInboxStore((s) => s.selectedId);
+  const selectId = useInboxStore((s) => s.selectId);
+  const retryLoad = useInboxStore((s) => s.retryLoad);
+  const now = useInboxStore((s) => s.now);
+
+  // Derive with useMemo so the render never depends on a fresh-array snapshot.
+  const list = useMemo(
+    () =>
+      conversations
+        .filter((c) => c.bucket === activeBucket)
+        .filter((c) => sourceFilter === "all" || c.source === sourceFilter)
+        .sort((a, b) => +new Date(b.lastActivity) - +new Date(a.lastActivity)),
+    [conversations, activeBucket, sourceFilter],
+  );
+
+  return (
+    <div className="flex h-full min-w-0 flex-col border-r border-border">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
+        <h2 className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[-0.01em]">
+          {BUCKET_META[activeBucket].label}
+          <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[10.5px] tabular-nums text-muted-foreground">
+            {list.length}
+          </span>
+        </h2>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {loadState === "loading" ? (
+          <ListSkeleton />
+        ) : loadState === "error" ? (
+          <ErrorState source="iMessage" onRetry={retryLoad} />
+        ) : list.length === 0 ? (
+          <EmptyBucket label={BUCKET_META[activeBucket].label} />
+        ) : (
+          list.map((c) => (
+            <ConversationRow
+              key={c.id}
+              conversation={c}
+              selected={c.id === selectedId}
+              now={now}
+              onClick={() => selectId(c.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

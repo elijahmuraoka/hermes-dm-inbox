@@ -1,0 +1,292 @@
+@import "tailwindcss";
+
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+
+/* Dark is driven by a `.dark` class on <html> (next-themes attribute="class"). */
+@custom-variant dark (&:is(.dark *));
+
+/* ───────────────────────── Light (crisp, Superhuman-adjacent) ───────────────────────── */
+:root {
+  --radius: 0.625rem;
+  --transition-duration: 180ms;
+  --ease-house: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.2 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.97 0.003 260);
+  --muted-foreground: oklch(0.44 0.014 262); /* AA on near-white, incl. 10–11px */
+  --primary: oklch(0.48 0.16 245); /* deep blue-cyan; AA for white button text */
+  --primary-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.96 0.004 260);
+  --secondary-foreground: oklch(0.25 0.012 260);
+  --accent: oklch(0.95 0.012 235);
+  --accent-foreground: oklch(0.25 0.012 260);
+  --destructive: oklch(0.58 0.19 27);
+  --destructive-foreground: oklch(0.99 0.002 250);
+  --border: oklch(0.2 0.02 260 / 10%);
+  --input: oklch(0.2 0.02 260 / 12%);
+  --ring: oklch(0.48 0.16 245 / 50%);
+
+  --sidebar: oklch(0.985 0.002 260);
+  --sidebar-foreground: oklch(0.2 0.01 260);
+  --sidebar-primary: oklch(0.55 0.15 235);
+  --sidebar-primary-foreground: oklch(0.99 0.002 250);
+  --sidebar-accent: oklch(0.95 0.012 235);
+  --sidebar-accent-foreground: oklch(0.25 0.012 260);
+  --sidebar-border: oklch(0.2 0.02 260 / 8%);
+  --sidebar-ring: oklch(0.55 0.15 235 / 45%);
+
+  /* Inbox semantic tokens */
+  --bucket-needs: oklch(0.55 0.15 235);
+  --bucket-drafted: oklch(0.56 0.14 285); /* soft violet-blue */
+  --bucket-waiting: oklch(0.68 0.14 75); /* amber */
+  --bucket-fyi: oklch(0.6 0.02 260); /* slate/muted */
+  --bucket-done: oklch(0.6 0.14 150); /* green */
+  --urgency-high: oklch(0.58 0.19 27);
+  --status-unread: oklch(0.55 0.15 235);
+
+  /* The one privacy signal: a body shared into Hermes' context (amber). */
+  --priv-shared: oklch(0.55 0.16 62);
+
+  --glow-primary: oklch(0.55 0.15 235 / 22%);
+  --agent-label: oklch(0.46 0.15 250); /* darker so small-caps HERMES passes AA on light */
+}
+
+/* ───────────────────────── Dark (primary, "operator") ───────────────────────── */
+.dark {
+  --background: oklch(0.16 0.012 260); /* near-black, faint cool cast */
+  --foreground: oklch(0.95 0.006 250);
+  --card: oklch(0.2 0.014 260);
+  --card-foreground: oklch(0.95 0.006 250);
+  --popover: oklch(0.19 0.014 262);
+  --popover-foreground: oklch(0.95 0.006 250);
+  --muted: oklch(0.26 0.012 260);
+  --muted-foreground: oklch(0.74 0.016 255); /* AA on near-black, incl. 10–11px */
+  --primary: oklch(0.78 0.13 230); /* signature cyan glow — the ONE accent */
+  --primary-foreground: oklch(0.16 0.02 250);
+  --agent-label: oklch(0.82 0.12 232); /* bright cyan; AA on near-black */
+  --secondary: oklch(0.24 0.014 260);
+  --secondary-foreground: oklch(0.95 0.006 250);
+  --accent: oklch(0.3 0.02 250);
+  --accent-foreground: oklch(0.95 0.006 250);
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.96 0.006 250);
+  --border: oklch(1 0 0 / 8%); /* hairline via alpha */
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.78 0.13 230 / 55%);
+
+  --sidebar: oklch(0.17 0.012 260);
+  --sidebar-foreground: oklch(0.9 0.006 250);
+  --sidebar-primary: oklch(0.78 0.13 230);
+  --sidebar-primary-foreground: oklch(0.16 0.02 250);
+  --sidebar-accent: oklch(0.3 0.02 250);
+  --sidebar-accent-foreground: oklch(0.95 0.006 250);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.78 0.13 230 / 55%);
+
+  --bucket-needs: oklch(0.78 0.13 230);
+  --bucket-drafted: oklch(0.68 0.12 288);
+  --bucket-waiting: oklch(0.78 0.13 78);
+  --bucket-fyi: oklch(0.68 0.014 255);
+  --bucket-done: oklch(0.72 0.15 152);
+  --urgency-high: oklch(0.68 0.19 25);
+  --status-unread: oklch(0.78 0.13 230);
+
+  --priv-shared: oklch(0.8 0.14 70); /* amber, AA on near-black */
+
+  --glow-primary: oklch(0.78 0.13 230 / 28%);
+}
+
+/* ───────────────────────── Map tokens → Tailwind utilities ───────────────────────── */
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "IBM Plex Mono", monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-bucket-needs: var(--bucket-needs);
+  --color-bucket-drafted: var(--bucket-drafted);
+  --color-bucket-waiting: var(--bucket-waiting);
+  --color-bucket-fyi: var(--bucket-fyi);
+  --color-bucket-done: var(--bucket-done);
+  --color-urgency-high: var(--urgency-high);
+  --color-status-unread: var(--status-unread);
+
+  --color-priv-shared: var(--priv-shared);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  /* Focus system — every interactive control gets a visible ring (canon). */
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--ring);
+    border-radius: var(--radius-sm);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Tabular numerals for every metric/count/timestamp (numerals rule). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Scrollbars — quiet, operator. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--foreground) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.4s var(--ease-house) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes stream-line {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in var(--transition-duration) var(--ease-house);
+}
+.animate-scale-in {
+  animation: scale-in 140ms var(--ease-house);
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-sheet-up {
+  animation: sheet-up 200ms var(--ease-house);
+}
+.animate-stream {
+  animation: stream-line 260ms var(--ease-house) both;
+}
