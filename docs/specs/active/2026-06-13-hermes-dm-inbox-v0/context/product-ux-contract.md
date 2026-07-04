@@ -24,7 +24,7 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 
 | Surface | Purpose |
 |---|---|
-| Inbox/Triage | process conversations by priority/action bucket |
+| Inbox/Triage | process conversations by view (Needs Reply / Sent / All) |
 | Thread | read selected conversation with privacy state |
 | Draft panel | ask Hermes, edit/regenerate/approve draft intent |
 | Command palette | execute all actions without leaving keyboard |
@@ -33,17 +33,48 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 | Audit/share log | inspect share-to-agent and other privacy-sensitive events |
 | Settings/connectors | source health, sync, connector setup guidance |
 
-### Core buckets
+### Core views (v5 — supersedes the five-bucket taxonomy)
 
-Default buckets:
+> **DECISION v5 — Elijah, 2026-07-03 (naming final: NEEDS REPLY / SENT / ALL).** The five buckets
+> (Needs Reply / Drafted / Waiting / FYI / Done) collapse to **three views**, and the parked
+> four-bucket proposal is superseded with them.
+>
+> **Reasoning:** the bucket model's internal logic — "whose court is the ball in?" — was right, but five
+> resting places meant five inboxes to check, and FYI/Done overlapped because "no action" is not a place
+> you visit; it's the absence of a place. A **view is a way of looking, not a place things live**.
+> **Naming:** a symmetric turn-based pair ("Your turn / Their turn") was considered, but **familiar
+> names won** — Needs Reply and Sent are words every inbox user already owns; the one novel move is
+> Sent-as-open-threads, not the vocabulary.
 
-- Needs Reply
-- Drafted
-- Waiting
-- FYI
-- Done
+- **Needs Reply** — home/default. Everything waiting on you (reply OR action); absorbs the old Needs
+  Reply and Drafted. Every row carries a **priority slot** (red dot high / amber dot medium / empty
+  normal — Hermes-computed urgency, words in the tooltip; visible in All too). Threads with a ready
+  Hermes draft show a draft chip and boost within their priority tier.
+- **Sent** — open threads only by default, grouped: **"Needs follow-up"** (sent, no response, ≥ 3 days
+  quiet) on top — `d` there drafts an angle-aware nudge (gentle nudge / direct ask / brief bump) — then
+  **"Awaiting"** (fresh). Sent-and-done threads hide behind a subtle **"Show done"** toggle (honest
+  count) at the top of the list; `e` on a sent thread marks it done and it leaves the default view.
+  Sent = open-threads-on-my-side-of-the-net.
+- **All** — everything, newest first. The trust anchor and skim surface; no-action items live only
+  here (and behind Sent's toggle when the last word was yours).
 
-These are local states derived from message metadata, user corrections, and Hermes suggestions. They are not the same as source-native folders.
+**Default sort orders are spec:** Needs Reply sorts by priority desc → draft-ready boost within tier →
+oldest first (a triage queue; old debt surfaces). Sent groups by obligation (needs-follow-up stalest
+first, then awaiting fresh). All sorts newest-first. **Sort controls** exist on every view
+(⌘K-reachable: default / newest / oldest); an override flattens Sent's grouping and is always visibly
+chipped.
+
+**Filters** (source / person / unread / has-draft) apply on every view, render as a chip bar under the
+list header, and are ⌘K-reachable (person picking is a palette sub-page).
+
+**Snoozed is not a view:** a snoozed thread hides from the working views until it returns, with an
+honest count in the rail; All still shows it (marked), because All omits nothing.
+
+**Post-send routing:** a send always lands the thread in Sent (open); Hermes only **suggests**
+done-vs-open in one quiet strip with the action one tap away ("Mark done" / "Reopen").
+
+Underneath, a thread's status is `needs_reply | sent | done` — local state derived from message
+metadata, user corrections, and Hermes suggestions; not source-native folders.
 
 ## Main layout
 
@@ -51,7 +82,7 @@ These are local states derived from message metadata, user corrections, and Herm
 ┌────────────────────────────────────────────────────────────────┐
 │ top bar: source filter, search, sync status, command palette    │
 ├───────────────┬──────────────────────────────┬─────────────────┤
-│ buckets       │ conversation list             │ thread + draft  │
+│ views         │ conversation list             │ thread + draft  │
 │ sources       │ triage state / preview        │ messages        │
 │ saved filters │ urgency / draft status        │ Hermes panel    │
 └───────────────┴──────────────────────────────┴─────────────────┘
@@ -71,10 +102,9 @@ Global:
 | `Cmd+K` | command palette |
 | `?` | shortcut help |
 | `/` | search |
-| `g i` | inbox |
-| `g d` | drafts |
-| `g a` | audit/share log |
-| `r` | sync/refresh |
+| `g n` | Needs Reply |
+| `g s` | Sent |
+| `g a` | All |
 
 Conversation navigation:
 
@@ -113,14 +143,14 @@ Drafting means Hermes reads the thread (see Privacy/sharing UX) — no share sig
 
 Command categories:
 
-- Navigate: inbox, drafts, audit, settings
-- Sync: sync all, sync source, connector health
-- Search: global search, source search, person search
-- Triage: classify unread, mark done, waiting, FYI, noise
-- Draft: draft reply, regenerate, change tone, shorten, approve intent
-- Privacy: share with Hermes, unshare, view audit log
-- Tasks: create follow-up, show tasks, mark complete
-- Labels: add/remove label, saved filters
+- Navigate: Needs Reply, Sent, All, shortcuts
+- Filter: source, unread only, has draft, filter by person (sub-page), sort override, Sent show-done, clear filters
+- Sync: sync all, sync source, connector health (Phase 1 — no fake commands before real sync)
+- Search: global search, source search
+- Triage: mark done, snooze
+- Draft: draft reply/follow-up, add draft to chat, focus composer, send
+- Tasks: create follow-up, show tasks, mark complete (Phase 1+)
+- Labels: add/remove label, saved filters (Phase 1+)
 
 Rules:
 
@@ -133,12 +163,13 @@ Rules:
 
 Human loop:
 
-1. Open Needs Reply.
-2. Move with `j/k`.
+1. Open Needs Reply (home).
+2. Move with `j/k` — the queue already leads with leverage (drafts, urgency, oldest debt).
 3. Use Hermes suggested label/priority.
 4. Press `d` to generate draft or `e` to mark done.
-5. Press `s` to snooze if no action now.
-6. Correct Hermes classification when wrong.
+5. Press `s` to snooze if no action now (hidden until it returns; counted in the rail).
+6. Sweep Sent for "Needs follow-up" threads; `d` there drafts a nudge.
+7. Correct Hermes classification when wrong (post-send routing has a one-tap flip).
 
 Hermes should compute:
 
@@ -146,7 +177,7 @@ Hermes should compute:
 - urgency
 - relationship/source context
 - likely follow-up task
-- suggested bucket
+- suggested post-send routing (done vs open)
 - suggested draft availability
 
 Hermes should not:
@@ -222,22 +253,17 @@ Rules:
 - The agent still cannot grant itself body access: thread reads happen only as a consequence of the
   human's draft request.
 
-### Bucket semantics (Elijah addendum, 2026-07-03)
+### Bucket semantics (Elijah addendum, 2026-07-03) — SUPERSEDED by v5
 
-Elijah flagged that Needs Reply / Waiting / FYI read as overlapping. The internal model is crisp — the
-buckets answer **"whose court is the ball in?"** — but the names didn't carry it. Resolution:
+> **Superseded the same day** by DECISION v5 (see "Core views" above): the structural question this
+> section left open (FYI vs Done overlap) was resolved by deleting both as places — three views now
+> stand (Needs Reply / Sent / All), and the four-bucket proposal below was never implemented.
 
-1. **Renames + visible semantics:** "Waiting" → **"Waiting on them"**; every bucket shows a one-line
-   description under the list header (Needs Reply = "The ball is in your court"; Waiting on them = "You
-   acted; the ball is in their court"; FYI = "No reply expected — read and move on"; Done = "Handled").
-2. **Fixture audit:** mock triage content is bucket-coherent by construction — the generator assigns
-   snippets from per-bucket pools (needs = direct question to you, incoming; waiting = your outgoing ask;
-   fyi = pure broadcast, nothing owed; done = closed confirmation), so no fixture plausibly straddles two.
-3. **Structural question (open, for Elijah):** the residual overlap is **FYI vs Done** — both are "no
-   action". FYI is really a *triage suggestion* ("no reply expected"), not a resting place; after reading,
-   an FYI is effectively Done. Proposal if simplification is wanted: **four buckets** — Needs Reply /
-   Drafted / Waiting on them / **No action** (FYI+Done merged; unread dots surface the new-but-ignorable
-   items). Not implemented — five buckets stand until Elijah picks.
+Kept for the decision trail: Elijah flagged that Needs Reply / Waiting / FYI read as overlapping. The
+internal model was crisp — the buckets answer **"whose court is the ball in?"** — but the names didn't
+carry it. The interim resolution (renames + one-line `desc` under the list header + bucket-coherent
+fixture pools) shipped, and its parts survive in v5: the descriptions, the coherent per-status fixture
+pools, and the whose-court model itself — now expressed as two symmetric views instead of five buckets.
 
 ## Search UX
 
@@ -245,7 +271,7 @@ Default search should be safe/redacted:
 
 - searches metadata, participants/aliases, labels, redacted previews, task text
 - body search requires explicit body-search design later
-- results show source, participant, date, bucket, redacted preview
+- results show source, participant, date, status (whose turn), redacted preview
 
 Possible later modes:
 
@@ -273,7 +299,7 @@ Must define now:
 - main layout
 - hotkeys
 - command palette categories
-- bucket model
+- view model (Needs Reply / Sent / All) + sort orders
 - share-to-Hermes language
 - draft lifecycle
 - loading/empty/error states
@@ -292,13 +318,13 @@ Can defer:
 
 A public user can run the app with mock data and:
 
-1. see a fast inbox list
+1. see a fast inbox list (three views: Needs Reply / Sent / All)
 2. navigate with keyboard
 3. open a thread and read every message body
-4. see the default (not-shared) state carry no privacy chrome
-5. explicitly share a mock body with Hermes (and unshare it)
-6. ask mock Hermes to draft
-7. approve draft intent
+4. see threads carry zero privacy chrome (v4 — the boundary is architectural)
+5. ask mock Hermes to draft — the ask means Hermes reads the thread (v2/v4)
+6. refine the draft in the studio chat, add it to the composer, send (v3/v4)
+7. see the post-send routing suggestion and flip it in one tap (v5)
 8. inspect audit events
 9. run matching `hdi` commands
 
