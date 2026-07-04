@@ -37,12 +37,12 @@ export function useKeyboard() {
       if (isTyping(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // g-prefix combos
+      // g-prefix combos — the three views (v5 final): g n / g s / g a
       if (gPending.current) {
         clearG();
-        if (e.key === "i") return void st.setBucket("needs");
-        if (e.key === "d") return void st.setBucket("drafted");
-        if (e.key === "a") return void st.setShortcuts(true); // audit stand-in for slice
+        if (e.key === "n") return void st.setView("needs_reply");
+        if (e.key === "s") return void st.setView("sent");
+        if (e.key === "a") return void st.setView("all");
       }
 
       switch (e.key) {

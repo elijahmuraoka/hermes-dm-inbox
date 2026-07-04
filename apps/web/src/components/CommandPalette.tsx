@@ -1,17 +1,22 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Command } from "cmdk";
 import { useInboxStore } from "@/hooks/useInboxStore";
-import { BUCKET_META, SOURCE_META, type Bucket, type SourceId } from "@/lib/types";
+import { VIEW_META, SOURCE_META, type SourceId, type ViewId } from "@/lib/types";
+import { anyFilterActive } from "@/lib/derive";
+import { PEOPLE } from "@/lib/mock-data";
 import { Kbd } from "@/components/ui/kbd";
 import { HermesMark } from "@/components/HermesMark";
 import {
   ArrowRight,
   Check,
   FileText,
+  Filter,
   Inbox,
   RefreshCw,
   Search,
   SendHorizontal,
+  User,
+  X,
 } from "lucide-react";
 
 type Scope = "global" | "selected" | "thread" | "source";
@@ -37,8 +42,19 @@ const SCOPE_LABEL: Record<Scope, string> = {
 export function CommandPalette() {
   const open = useInboxStore((s) => s.paletteOpen);
   const setPalette = useInboxStore((s) => s.setPalette);
-  const setBucket = useInboxStore((s) => s.setBucket);
-  const setSourceFilter = useInboxStore((s) => s.setSourceFilter);
+  const setView = useInboxStore((s) => s.setView);
+  const setSource = useInboxStore((s) => s.setSource);
+  const setPersonFilter = useInboxStore((s) => s.setPersonFilter);
+  const toggleUnreadFilter = useInboxStore((s) => s.toggleUnreadFilter);
+  const toggleHasDraftFilter = useInboxStore((s) => s.toggleHasDraftFilter);
+  const clearFilters = useInboxStore((s) => s.clearFilters);
+  const filters = useInboxStore((s) => s.filters);
+  const activeView = useInboxStore((s) => s.activeView);
+  const sortModes = useInboxStore((s) => s.sortModes);
+  const setSortMode = useInboxStore((s) => s.setSortMode);
+  const showDoneInSent = useInboxStore((s) => s.showDoneInSent);
+  const toggleShowDone = useInboxStore((s) => s.toggleShowDone);
+  const conversations = useInboxStore((s) => s.conversations);
   const setShortcuts = useInboxStore((s) => s.setShortcuts);
   const markDone = useInboxStore((s) => s.markDone);
   const snooze = useInboxStore((s) => s.snooze);
@@ -48,6 +64,19 @@ export function CommandPalette() {
   const sendMock = useInboxStore((s) => s.sendMock);
   const composerText = useInboxStore((s) => s.composerText);
   const selected = useInboxStore((s) => s.selected());
+
+  // Two pages, Raycast-style: "main" and the person picker. Filtering by
+  // person is ⌘K-reachable without flooding the main list with 45 names.
+  // The query is controlled so a page switch starts clean; Backspace on an
+  // empty query returns to the main page.
+  const [page, setPage] = useState<"main" | "person">("main");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (open) {
+      setPage("main");
+      setSearch("");
+    }
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,31 +95,112 @@ export function CommandPalette() {
     close();
   };
 
+  // People present in the inbox, for the person-filter page.
+  const people = useMemo(() => {
+    const ids = [...new Set(conversations.map((c) => c.personId))];
+    return ids
+      .map((id) => PEOPLE[id])
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [conversations]);
+
   const commands: Cmd[] = useMemo(() => {
     const list: Cmd[] = [
-      // Navigate
-      ...(Object.keys(BUCKET_META) as Bucket[]).map((b) => ({
-        id: `nav-${b}`,
-        label: `Go to ${BUCKET_META[b].label}`,
+      // Navigate — the three views (v5)
+      ...(Object.keys(VIEW_META) as ViewId[]).map((v) => ({
+        id: `nav-${v}`,
+        label: `Go to ${VIEW_META[v].label}`,
         group: "Navigate",
         scope: "global" as Scope,
-        keys: BUCKET_META[b].key || undefined,
+        keys: VIEW_META[v].key,
         icon: Inbox,
-        run: withClose(() => setBucket(b)),
+        run: withClose(() => setView(v)),
       })),
       // NOTE: no "Sync" commands yet — sync doesn't exist in the mock slice, and a
-      // no-op command would be a fake affordance (honesty guardrail). Phase 1 adds
-      // real mock sync + the `r` rebinding per the keyboard contract.
-      // Source filter
-      { id: "src-all", label: "Filter: all sources", group: "Search", scope: "source", icon: Search, run: withClose(() => setSourceFilter("all")) },
+      // no-op command would be a fake affordance (honesty guardrail).
+      // Filter — filters bite on every view (v5)
+      { id: "flt-all", label: "Filter: all sources", group: "Filter", scope: "source", icon: Filter, run: withClose(() => setSource("all")) },
       ...(Object.keys(SOURCE_META) as SourceId[]).map((s) => ({
-        id: `src-${s}`,
+        id: `flt-${s}`,
         label: `Filter: ${SOURCE_META[s].label}`,
-        group: "Search",
+        group: "Filter",
         scope: "source" as Scope,
-        icon: Search,
-        run: withClose(() => setSourceFilter(s)),
+        icon: Filter,
+        run: withClose(() => setSource(s)),
       })),
+      {
+        id: "flt-unread",
+        label: filters.unreadOnly ? "Filter: show read too" : "Filter: unread only",
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => toggleUnreadFilter()),
+      },
+      {
+        id: "flt-draft",
+        label: filters.hasDraftOnly ? "Filter: any draft state" : "Filter: has draft",
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => toggleHasDraftFilter()),
+      },
+      {
+        id: "flt-person",
+        label: "Filter by person…",
+        group: "Filter",
+        scope: "global",
+        icon: User,
+        run: () => {
+          setPage("person"); // stays open — the pick happens on the next page
+          setSearch("");
+        },
+      },
+      {
+        id: "flt-clear",
+        label: "Clear all filters",
+        group: "Filter",
+        scope: "global",
+        icon: X,
+        run: withClose(() => clearFilters()),
+        disabled: !anyFilterActive(filters),
+      },
+      // Sort — per-view override; "default" restores the specced order
+      // (priority queue in Needs Reply, grouped staleness in Sent, newest in All).
+      {
+        id: "sort-default",
+        label: `Sort ${VIEW_META[activeView].label}: default order`,
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => setSortMode("default")),
+        disabled: sortModes[activeView] === "default",
+      },
+      {
+        id: "sort-newest",
+        label: `Sort ${VIEW_META[activeView].label}: newest first`,
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => setSortMode("newest")),
+        disabled: sortModes[activeView] === "newest",
+      },
+      {
+        id: "sort-oldest",
+        label: `Sort ${VIEW_META[activeView].label}: oldest first`,
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => setSortMode("oldest")),
+        disabled: sortModes[activeView] === "oldest",
+      },
+      {
+        id: "sent-show-done",
+        label: showDoneInSent ? "Sent view: hide done" : "Sent view: show done",
+        group: "Filter",
+        scope: "global",
+        icon: Check,
+        run: withClose(() => toggleShowDone()),
+      },
       // Triage
       {
         id: "triage-done",
@@ -104,7 +214,7 @@ export function CommandPalette() {
       },
       {
         id: "triage-snooze",
-        label: "Snooze selected → Waiting",
+        label: "Snooze selected",
         group: "Triage",
         scope: "selected",
         keys: "s",
@@ -115,7 +225,10 @@ export function CommandPalette() {
       // Draft
       {
         id: "draft-reply",
-        label: "Draft reply with Hermes",
+        label:
+          selected?.status === "sent"
+            ? "Draft follow-up with Hermes"
+            : "Draft reply with Hermes",
         group: "Draft",
         scope: "thread",
         keys: "d",
@@ -169,7 +282,7 @@ export function CommandPalette() {
       list.push(
         {
           id: "dev-demo-empty",
-          label: "Demo: empty bucket state",
+          label: "Demo: empty view state",
           group: "Dev",
           scope: "global",
           icon: Inbox,
@@ -187,10 +300,10 @@ export function CommandPalette() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, composerText, setBucket, setSourceFilter, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
+  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
-    const order = ["Navigate", "Search", "Triage", "Draft", "Dev"];
+    const order = ["Navigate", "Filter", "Triage", "Draft", "Dev"];
     const byGroup = new Map<string, Cmd[]>();
     for (const c of commands) {
       if (!byGroup.has(c.group)) byGroup.set(c.group, []);
@@ -214,6 +327,12 @@ export function CommandPalette() {
           loop
           className="flex flex-col"
           label="Command palette"
+          onKeyDown={(e) => {
+            if (page === "person" && e.key === "Backspace" && !search) {
+              e.preventDefault();
+              setPage("main");
+            }
+          }}
         >
           {/* NO focus ring here — the open modal IS the focus scope
               (Raycast/Linear pattern). Borderless input, caret + placeholder,
@@ -222,43 +341,71 @@ export function CommandPalette() {
             <Search className="size-4 text-muted-foreground" />
             <Command.Input
               autoFocus
-              placeholder="Type a command or search…"
+              value={search}
+              onValueChange={setSearch}
+              placeholder={page === "person" ? "Filter by person…" : "Type a command or search…"}
               className="h-11 flex-1 border-0 bg-transparent text-[0.8125rem] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus:ring-0 focus-visible:!shadow-none focus-visible:!outline-none focus-visible:!ring-0"
             />
             <Kbd>esc</Kbd>
           </div>
           <Command.List className="max-h-[52vh] overflow-y-auto p-1.5">
             <Command.Empty className="px-3 py-6 text-center text-[0.78125rem] text-muted-foreground">
-              No matching commands.
+              {page === "person" ? "No matching people." : "No matching commands."}
             </Command.Empty>
-            {groups.map(([group, cmds]) => (
+            {page === "person" ? (
               <Command.Group
-                key={group}
                 heading={
                   <span className="px-2 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
-                    {group}
+                    People
                   </span>
                 }
                 className="mb-1 [&_[cmdk-group-heading]]:py-1"
               >
-                {cmds.map((c) => (
+                {people.map((p) => (
                   <Command.Item
-                    key={c.id}
-                    value={`${c.label} ${c.group}`}
-                    disabled={c.disabled}
-                    onSelect={c.run}
+                    key={p.id}
+                    value={`${p.name} ${p.handle}`}
+                    onSelect={withClose(() => setPersonFilter(p.id))}
                     className={cmdItemClass}
                   >
-                    <c.icon className="size-3.5 text-muted-foreground" />
-                    <span className="flex-1 text-[0.78125rem]">{c.label}</span>
-                    <span className="rounded-[4px] bg-muted/60 px-1.5 py-px font-mono text-[0.59375rem] text-muted-foreground">
-                      {SCOPE_LABEL[c.scope]}
+                    <User className="size-3.5 text-muted-foreground" />
+                    <span className="flex-1 text-[0.78125rem]">{p.name}</span>
+                    <span className="font-mono text-[0.625rem] text-muted-foreground">
+                      {p.handle}
                     </span>
-                    {c.keys && <Kbd>{c.keys}</Kbd>}
                   </Command.Item>
                 ))}
               </Command.Group>
-            ))}
+            ) : (
+              groups.map(([group, cmds]) => (
+                <Command.Group
+                  key={group}
+                  heading={
+                    <span className="px-2 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
+                      {group}
+                    </span>
+                  }
+                  className="mb-1 [&_[cmdk-group-heading]]:py-1"
+                >
+                  {cmds.map((c) => (
+                    <Command.Item
+                      key={c.id}
+                      value={`${c.label} ${c.group}`}
+                      disabled={c.disabled}
+                      onSelect={c.run}
+                      className={cmdItemClass}
+                    >
+                      <c.icon className="size-3.5 text-muted-foreground" />
+                      <span className="flex-1 text-[0.78125rem]">{c.label}</span>
+                      <span className="rounded-[4px] bg-muted/60 px-1.5 py-px font-mono text-[0.59375rem] text-muted-foreground">
+                        {SCOPE_LABEL[c.scope]}
+                      </span>
+                      {c.keys && <Kbd>{c.keys}</Kbd>}
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+              ))
+            )}
           </Command.List>
         </Command>
       </div>

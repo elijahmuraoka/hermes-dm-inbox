@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { useKeyboard } from "@/hooks/useKeyboard";
-import { BucketNav } from "@/components/BucketNav";
+import { ViewNav } from "@/components/ViewNav";
 import { Topbar } from "@/components/Topbar";
 import { ConversationList } from "@/components/ConversationList";
 import { Thread } from "@/components/Thread";
@@ -20,7 +20,7 @@ export default function App() {
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
   const drawerOpen = useInboxStore((s) => s.drawerOpen);
   const setDrawer = useInboxStore((s) => s.setDrawer);
-  const setBucket = useInboxStore((s) => s.setBucket);
+  const setView = useInboxStore((s) => s.setView);
 
   // Mock initial sync → ready, then select the first row (shows skeletons briefly).
   // Dev/demo: ?state=empty and ?state=error land on those states instead, so the
@@ -33,19 +33,19 @@ export default function App() {
         return;
       }
       useInboxStore.setState({ loadState: "ready" });
-      setBucket("needs");
+      setView("needs_reply");
     }, 650);
     return () => window.clearTimeout(t);
-  }, [setBucket]);
+  }, [setView]);
 
   const showThread = loadState === "ready" && selected;
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-      {/* Left rail: buckets + sources live in the side rail from md up (Elijah's
+      {/* Left rail: views + sources live in the side rail from md up (Elijah's
           call — no top chip bar at tablet widths). Below md it's the drawer. */}
       <div className="hidden md:flex">
-        <BucketNav />
+        <ViewNav />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -82,7 +82,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Mobile drawer (<md): hamburger → the same bucket/source rail. */}
+      {/* Mobile drawer (<md): hamburger → the same view/source rail. */}
       {drawerOpen && <MobileDrawer onClose={() => setDrawer(false)} />}
 
       {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
@@ -159,11 +159,11 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Buckets and sources"
+        aria-label="Views and sources"
         className="animate-drawer-in h-full shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <BucketNav />
+        <ViewNav />
       </div>
     </div>
   );

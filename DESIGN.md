@@ -93,15 +93,15 @@ Define once, both themes. Components reference these, never raw colors.
 
 | Token | Meaning | Dark | Light |
 |---|---|---|---|
-| `--bucket-needs`  | Needs Reply accent | cyan `--primary` | blue `--primary` |
-| `--bucket-drafted`| Drafted | soft violet-blue | soft violet-blue |
-| `--bucket-waiting`| Waiting | amber | amber |
-| `--bucket-fyi`    | FYI | slate/muted | slate/muted |
-| `--bucket-done`   | Done | green | green |
-| `--urgency-high`  | urgent | `--destructive` | `--destructive` |
+| `--view-needs-reply` | Needs Reply accent — home, the work | cyan `--primary` | blue `--primary` |
+| `--view-sent`      | Sent — open threads, your side of the net | green | green |
+| `--view-all`       | All — the neutral ledger | slate/muted | slate/muted |
+| `--draft-ready`    | a Hermes draft awaits (row chip/dot) | soft violet-blue | soft violet-blue |
+| `--status-ok`      | sync healthy | green | green |
+| `--urgency-high`  | priority HIGH dot (Hermes triage) | `--destructive` | `--destructive` |
 | `--status-unread` | unread dot/weight | `--primary` | `--primary` |
 | **Hermes presence ↓** | | | |
-| `--hermes` | amber — marks Hermes surfaces (mark chip, studio, HERMES label) | oklch(0.8 0.14 70) | oklch(0.48 0.15 60) |
+| `--hermes` | amber — marks Hermes surfaces (mark chip, studio, HERMES label) AND the medium-priority dot: priority is Hermes's triage voice | oklch(0.8 0.14 70) | oklch(0.48 0.15 60) |
 
 > **DECISION v4 — Elijah, 2026-07-03 (supersedes v2's sharing apparatus).** The consent theater is
 > collapsed: **no "Hermes sees this thread" chip, no Block/Allow switch, no share ticks, no body-policy
@@ -110,6 +110,30 @@ Define once, both themes. Components reference these, never raw colors.
 > the agent is (the wing chip, the studio chat, the HERMES strip label) — never "what Hermes sees".
 > (Still standing from v1/v2: bodies always visible to the human; drafting reads the thread, full stop.)
 
+> **DECISION v5 — Elijah, 2026-07-03 (supersedes the five-bucket taxonomy AND the parked four-bucket
+> proposal).** The five buckets collapse to **three VIEWS: Needs Reply · Sent · All**. Reasoning: the
+> buckets' internal logic ("whose court is the ball in?") was right, but five resting places meant five
+> inboxes to check; a view is a way of looking, not a place things live. **Naming:** a turn-based pair
+> ("Your turn / Their turn") was considered for its symmetry, but **familiar names won** — Needs Reply
+> and Sent are words every inbox user already owns; **the one novel move is Sent-as-open-threads**, not
+> the vocabulary. Specifics:
+> **Needs Reply** is home — everything waiting on you, reply or act (absorbs the old Needs Reply +
+> Drafted; ready drafts chip and boost within their priority tier). Every row carries a **priority
+> slot** — red dot high · amber dot medium · empty normal — Hermes-computed urgency with the words in
+> the tooltip; visible in All too.
+> **Sent** shows **open threads only** by default, grouped: **"Needs follow-up"** (sent, no response,
+> ≥3 days quiet) on top — `d` there drafts an angle-aware nudge (gentle nudge / direct ask / brief
+> bump) — then **"Awaiting"** (fresh). Sent-and-done threads hide behind a subtle **"Show done"**
+> toggle at the top of the list (honest count, nothing silently disappears); `e` on a sent thread marks
+> it done and it leaves the default view.
+> **All** is the trust anchor — everything, newest first.
+> **FYI and Done die as views**: "no action" is not a place you visit — done items live in All (and
+> behind Sent's toggle when the last word was yours). **Snoozed is not a view either**: hidden from the
+> working views until it returns, honest count in the rail, still present in All. **Post-send routing
+> simplifies:** a send always lands the thread in Sent (open); Hermes only *suggests* done-vs-open in a
+> one-quiet-line strip (Mark done / Reopen). Sent's accent moved OFF amber — amber stays
+> Hermes-presence-only (v4), which the medium-priority dot honors: priority is Hermes's triage voice.
+
 ---
 
 ## 4. Layout & density
@@ -117,12 +141,12 @@ Define once, both themes. Components reference these, never raw colors.
 Full target (3-pane) — Phase 0 may ship 2-col + modal palette (contract-approved):
 
 ```
-┌ topbar: source filter · search(/) · sync status · ⌘K ─────────────────┐
-├ buckets/sources ─┬ conversation list ────────────┬ thread + Hermes draft ┤
-│ Needs Reply  ·N  │ [row: dot · src · name ·       │ messages (all bodies  │
-│ Drafted      ·N  │  urgency/draft dots · preview  │  readable) …          │
-│ Waiting          │  · time — 1 line, 40px]        │ ── Hermes draft panel │
-│ FYI / Done       │  select=cyan wash · share=amber│  (lifecycle, controls)│
+┌ topbar: search(/) · sync status · ⌘K ──────────────────────────────────┐
+├ views/sources ───┬ conversation list ────────────┬ thread + Hermes draft ┤
+│ Needs Reply  ·N  │ [header: view · desc · filter  │ messages (all bodies  │
+│ Sent         ·N  │  chips] [row: dot · src · name │  readable) …          │
+│ All          ·N  │  · priority · chips · preview  │ ── Hermes draft panel │
+│ ☾ Snoozed     N  │  · time — 1 line, 40px]        │  (lifecycle, studio)  │
 └──────────────────┴────────────────────────────────┴───────────────────────┘
 ```
 
@@ -132,6 +156,15 @@ Full target (3-pane) — Phase 0 may ship 2-col + modal palette (contract-approv
 - **Edge language:** the row's left edge carries selection — **cyan = where you are** (full-row wash +
   inset ring). (v4: the amber share tick is gone; amber now lives on Hermes surfaces, not rows.)
 - Left rail is quiet (Tomoji `--sidebar*`); the **list is the workhorse**, the thread/draft the focus.
+- **Default sort orders are SPEC (v5 — Elijah):** each view's order is the argument for its existence.
+  **Needs Reply sorts by leverage** — priority desc (Hermes triage), then draft-ready boost within the
+  tier (the fastest wins), then **oldest-unanswered**: it's a triage queue, and old debt must surface;
+  newest-first would bury exactly what's slipping. **Sent groups by obligation** — "Needs follow-up"
+  (≥3d quiet, stalest first: the longest silence is the one to chase) above "Awaiting" (fresh, newest
+  first), done hidden behind the toggle. **All sorts newest-first** — the familiar skim; its trust
+  comes from omitting nothing, not from cleverness. Sort **overrides** exist on every view
+  (⌘K-reachable: default / newest / oldest); an override flattens Sent's grouping, and a non-default
+  sort is always visibly chipped in the filter bar — the list never silently reorders.
 - **No layout shift** while drafting/loading (contract perf rule) — reserve space; skeletons match final metrics.
 
 ---
@@ -143,19 +176,29 @@ Each ships with **all states** — default · hover · focus-visible · selected
 
 1. **ConversationRow** — **LOCKED: the "ledger" treatment** (bake-off winner, Elijah 2026-07-03; "edge" and
    "card" variants deleted). Single-line 2.5rem: unread dot slot · **brand source icon** (inline SVG, no
-   mono text tags) · fixed-width name (9.25rem) · urgency/draft dots · flex preview · tabular time.
-   Selection = full-row primary wash + inset ring (no avatar, no per-row chips, no share ticks — v4).
+   mono text tags) · fixed-width name (9.25rem) · **priority slot** (fixed width: red high · amber
+   medium · empty normal; Hermes-computed, words in the tooltip; `p` cycles the tiers) · flex preview ·
+   tabular time. Selection = full-row primary wash + inset ring (no avatar, no share ticks — v4).
+   **The row speaks the active view's language (v5):** Needs Reply shows a `Draft` chip when a Hermes
+   draft is ready (that's the leverage); Sent shows days-quiet (`4d`) and a `nudge · d` affordance once
+   stale (that's the time pressure); All shows a `snoozed` chip where honest (the skim omits nothing).
    `j/k` moves selection, `Enter` opens.
-2. **BucketNav** — buckets (with a one-line semantics `desc` under the list header: whose court is the ball
-   in?) + sources with brand icons, live counts (tabular); active bucket uses `--primary` edge. Lives in the
-   **side rail from `md` up**; below `md` it's a **hamburger → left drawer** (no top chip bar at tablet
-   widths — Elijah's call). `g i/g d/g a` unchanged.
+2. **ViewNav** — the three views (one-line semantics `desc` under the list header) + sources with brand
+   icons, live counts (tabular); active view uses `--primary` edge. A non-interactive **Snoozed count**
+   sits under the views when > 0 (not a view — an honest tally of what's hidden). Lives in the **side
+   rail from `md` up**; below `md` it's a **hamburger → left drawer** (no top chip bar at tablet widths
+   — Elijah's call). `g n` / `g s` / `g a` navigate the views. The list header also carries the
+   **filter chip bar** (sources · unread · has-draft · active person · non-default sort) — filters and
+   sort bite on every view, so they must be visible on every view. In Sent, a subtle **"Show done"
+   toggle** with an honest count sits at the top of the list.
 3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message or
    thread-level privacy chrome — v4). The Hermes strip carries only the triage rationale, with the HERMES
    label in presence amber.
 4. **HermesDraftPanel = the DRAFTING STUDIO** (v4) — lifecycle
    (`requested→angles_ready→generated→iterated(n)→added_to_chat→edited→sent`). On `d` Hermes returns
-   **three angled candidates (1 warm · 2 direct · 3 brief)** picked by number key. The picked card is
+   **three angled candidates** picked by number key — replies (1 warm · 2 direct · 3 brief) on a
+   needs-reply thread, **follow-ups (1 gentle nudge · 2 direct ask · 3 brief bump)** on a sent thread:
+   chasing, not answering (v5). The picked card is
    **read-only** at the top; under it, a **lightweight chat with Hermes**: freeform input ("tell Hermes
    what to change"), each Hermes reply = a **new version on the navigable stepper** (v1/v2/v3; hermes
    turns link to their version). Tone chips are **quick-inserts into the chat input**, not separate
@@ -165,16 +208,21 @@ Each ships with **all states** — default · hover · focus-visible · selected
    the composer remains the only send surface. Side rail at `xl+`, bottom sheet below.
 4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
    button, Send. `c` or `Enter`-in-thread focuses it; `⌘Enter` sends; `Esc` returns to list scope.
-   Sending appends the outgoing message and moves the thread to Waiting on them — **presented exactly as
-   a real send** (diegetic rule, §7). That v0 delivery is a local mock is code/commit/PR knowledge only.
-5. **CommandPalette (⌘K)** — categorized (Navigate/Search/Triage/Draft/Privacy/Tasks/Labels), shows scope
+   Sending appends the outgoing message — **presented exactly as a real send** (diegetic rule, §7). That
+   v0 delivery is a local mock is code/commit/PR knowledge only.
+5. **CommandPalette (⌘K)** — categorized (Navigate/Filter/Triage/Draft), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.
-6. **ThreadShareState** — the thread-level signal from §3 (chip + toggle in the Thread strip); the row tick
-   mirrors it. Renders **nothing** for unshared, unblocked threads.
+   The **person filter is a second page** (Raycast pattern) — 45 names never flood the main list;
+   Backspace on an empty query returns.
+6. **RoutingStrip** (v5, replaces the deleted ThreadShareState) — a send always lands the thread in
+   Sent (open); Hermes only **suggests** done-vs-open in one quiet line above the composer, HERMES label
+   in presence amber, with the action **one tap away** ("Mark done" / "Reopen"). Suggestion, not fait
+   accompli. Renders nothing on threads without a fresh outgoing send.
 7. **Keycap / focus system** — every interactive element has a **visible `:focus-visible` ring** (`--ring`);
    keyboard path is primary, mouse secondary. `?` opens the shortcut sheet.
-8. **StatusStates** — shared skeleton (shimmer via house curve), empty ("Needs Reply is clear" — calm, not a
-   sad illustration), error (recoverable, names the source + retry).
+8. **StatusStates** — shared skeleton (shimmer via house curve), empty ("You're all caught up" — calm, not a
+   sad illustration; names the filters when THEY are why it's blank), error (recoverable, names the
+   source + retry).
 
 ---
 

@@ -91,7 +91,44 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
         </div>
       </div>
 
+      <RoutingStrip conversation={c} />
       <Composer />
+    </div>
+  );
+}
+
+/** Post-send routing (v5 final): a send always lands the thread in Sent
+    (open); Hermes only SUGGESTS done-vs-open, in one quiet line with the
+    action one tap away. Suggestion, not fait accompli. */
+function RoutingStrip({ conversation: c }: { conversation: Conversation }) {
+  const flipRouting = useInboxStore((s) => s.flipRouting);
+  const lastMsg = c.messages[c.messages.length - 1];
+  if (!c.routedAfterSend || lastMsg?.direction !== "out") return null;
+
+  const done = c.status === "done";
+  const suggestsDone = c.routedAfterSend === "done";
+  return (
+    <div className="flex items-center gap-2 border-t border-border bg-muted/25 px-4 py-1.5">
+      <span
+        className="shrink-0 font-mono text-[0.59375rem] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--hermes)" }}
+      >
+        Hermes
+      </span>
+      <p className="min-w-0 truncate text-[0.71875rem] text-muted-foreground">
+        {done
+          ? "Marked done — nothing left here."
+          : suggestsDone
+            ? "This reads like a wrap-up — done?"
+            : "Sent — open until they respond."}
+      </p>
+      <button
+        type="button"
+        onClick={flipRouting}
+        className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[0.71875rem] font-medium text-primary transition-colors hover:bg-accent"
+      >
+        {done ? "Reopen" : "Mark done"}
+      </button>
     </div>
   );
 }

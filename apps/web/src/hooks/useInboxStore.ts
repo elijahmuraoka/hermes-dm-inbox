@@ -1,6 +1,28 @@
 import { create } from "zustand";
-import type { Bucket, Conversation, DraftAngle, DraftAngleTone, DraftChatMsg, SourceId } from "@/lib/types";
-import { ANGLES_BY_BODY, AUDIT_EVENTS, CONVERSATIONS, MOCK_NOW, type AngleSet } from "@/lib/mock-data";
+import type {
+  Conversation,
+  DraftAngle,
+  DraftAngleTone,
+  DraftChatMsg,
+  SourceId,
+  ThreadStatus,
+  ViewId,
+} from "@/lib/types";
+import {
+  ANGLES_BY_BODY,
+  AUDIT_EVENTS,
+  CONVERSATIONS,
+  MOCK_NOW,
+  NUDGES_BY_BODY,
+  type AngleSet,
+} from "@/lib/mock-data";
+import {
+  DEFAULT_SORTS,
+  NO_FILTERS,
+  deriveVisible,
+  type InboxFilters,
+  type SortMode,
+} from "@/lib/derive";
 import type { AuditEvent } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "error";
@@ -20,12 +42,14 @@ interface InboxState {
   loadState: LoadState;
   conversations: Conversation[];
   audit: AuditEvent[];
-  activeBucket: Bucket;
-  sourceFilter: SourceId | "all";
+  activeView: ViewId;
+  filters: InboxFilters;
+  sortModes: Record<ViewId, SortMode>; // per-view sort override ("default" = specced order)
+  showDoneInSent: boolean; // Sent's "Show done" toggle — done rows hide by default
   selectedId: string | null;
   mobilePane: "list" | "thread"; // active pane below the lg breakpoint
   draftSheetOpen: boolean; // bottom-sheet draft panel below xl — the hero loop must be visible everywhere
-  drawerOpen: boolean; // mobile (<md) hamburger drawer holding the bucket/source rail
+  drawerOpen: boolean; // mobile (<md) hamburger drawer holding the view/source rail
   paletteOpen: boolean;
   shortcutsOpen: boolean;
   drafting: boolean;
@@ -41,8 +65,7 @@ interface InboxState {
   selected: () => Conversation | null;
 
   // nav
-  setBucket: (b: Bucket) => void;
-  setSourceFilter: (s: SourceId | "all") => void;
+  setView: (v: ViewId) => void;
   selectNext: () => void;
   selectPrev: () => void;
   selectId: (id: string | null) => void;
@@ -53,10 +76,20 @@ interface InboxState {
   setDraftSheet: (open: boolean) => void;
   setDrawer: (open: boolean) => void;
 
+  // filters + sort — apply on every view, ⌘K-reachable
+  setSource: (s: SourceId | "all") => void;
+  setPersonFilter: (personId: string | null) => void;
+  toggleUnreadFilter: () => void;
+  toggleHasDraftFilter: () => void;
+  clearFilters: () => void;
+  setSortMode: (mode: SortMode) => void; // for the ACTIVE view
+  toggleShowDone: () => void; // Sent only
+
   // triage
   markDone: (id?: string) => void;
   snooze: (id?: string) => void;
   togglePriority: (id?: string) => void;
+  flipRouting: () => void; // one-tap Waiting ↔ Done flip on the post-send strip
 
   // hermes draft — the drafting studio
   requestDraft: () => void; // → 3 angled candidates (angles_ready)
@@ -70,7 +103,7 @@ interface InboxState {
   setComposerText: (text: string) => void;
   toggleAttach: () => void; // mock affordance — records intent, delivers nothing
   focusComposer: () => void;
-  sendMock: () => void; // ⌘Enter: local mock append, honestly labeled
+  sendMock: () => void; // ⌘Enter: local mock append, presented as a real send (diegetic)
 
   // lifecycle
   retryLoad: () => void;
@@ -90,13 +123,29 @@ function pushAudit(
   ];
 }
 
+// Post-send suggestion (v5 final): sending always lands the thread in Sent
+// (open) — Hermes only SUGGESTS done-vs-open. Asks win when both appear
+// ("Thanks! Can you…?" stays open).
+function suggestPostSend(text: string): ThreadStatus {
+  const t = text.toLowerCase();
+  const asks =
+    /\?|let me know|lmk|can you|could you|will you|would you|thoughts|keep me posted|circle back|when you get a chance/;
+  const closers =
+    /\b(sounds good|see you|perfect|confirmed|done|all set|no worries|thanks again|thank you)\b/;
+  if (asks.test(t)) return "sent";
+  if (closers.test(t)) return "done";
+  return "sent";
+}
+
 export const useInboxStore = create<InboxState>((set, get) => ({
   now: MOCK_NOW,
   loadState: "loading",
   conversations: CONVERSATIONS,
   audit: AUDIT_EVENTS,
-  activeBucket: "needs",
-  sourceFilter: "all",
+  activeView: "needs_reply",
+  filters: NO_FILTERS,
+  sortModes: { ...DEFAULT_SORTS },
+  showDoneInSent: false,
   selectedId: null,
   mobilePane: "list",
   draftSheetOpen: false,
@@ -110,11 +159,8 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   studioFocusTick: 0,
 
   visibleConversations: () => {
-    const { conversations, activeBucket, sourceFilter } = get();
-    return conversations
-      .filter((c) => c.bucket === activeBucket)
-      .filter((c) => sourceFilter === "all" || c.source === sourceFilter)
-      .sort((a, b) => +new Date(b.lastActivity) - +new Date(a.lastActivity));
+    const { conversations, activeView, filters, sortModes, showDoneInSent, now } = get();
+    return deriveVisible(conversations, activeView, filters, sortModes[activeView], showDoneInSent, now);
   },
 
   selected: () => {
@@ -122,16 +168,34 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     return conversations.find((c) => c.id === selectedId) ?? null;
   },
 
-  setBucket: (b) => {
-    set({ activeBucket: b, mobilePane: "list", draftSheetOpen: false, drawerOpen: false }); // list-level action
+  setView: (v) => {
+    set({ activeView: v, mobilePane: "list", draftSheetOpen: false, drawerOpen: false }); // list-level action
     const first = get().visibleConversations()[0] ?? null;
     set({ selectedId: first?.id ?? null });
   },
 
-  setSourceFilter: (s) => {
-    set({ sourceFilter: s, mobilePane: "list", drawerOpen: false }); // list-level action
+  // Every filter mutation re-anchors selection on the first visible row —
+  // a selection the view can no longer show is a lie.
+  setSource: (source) => applyFilters(set, get, { source }),
+  setPersonFilter: (personId) => applyFilters(set, get, { personId }),
+  toggleUnreadFilter: () => applyFilters(set, get, { unreadOnly: !get().filters.unreadOnly }),
+  toggleHasDraftFilter: () =>
+    applyFilters(set, get, { hasDraftOnly: !get().filters.hasDraftOnly }),
+  clearFilters: () => applyFilters(set, get, { ...NO_FILTERS }),
+
+  // Sort override for the active view; selection re-anchors like a filter.
+  setSortMode: (mode) => {
+    set((s) => ({ sortModes: { ...s.sortModes, [s.activeView]: mode } }));
     const first = get().visibleConversations()[0] ?? null;
     set({ selectedId: first?.id ?? null });
+  },
+
+  toggleShowDone: () => {
+    set((s) => ({ showDoneInSent: !s.showDoneInSent }));
+    // Hiding done can orphan the selection; re-anchor only if it vanished.
+    const { visibleConversations, selectedId } = get();
+    const list = visibleConversations();
+    if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
   },
 
   selectNext: () => {
@@ -173,7 +237,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!target) return;
     set((s) => ({
       conversations: s.conversations.map((c) =>
-        c.id === target ? { ...c, bucket: "done", unread: false } : c,
+        c.id === target ? { ...c, status: "done" as const, unread: false } : c,
       ),
       audit: pushAudit(
         s.audit,
@@ -185,26 +249,53 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     set({ selectedId: first?.id ?? null });
   },
 
+  // Snooze (v5): hide from the working views until it returns — status is
+  // untouched (whose court the ball is in doesn't change because you looked
+  // away). Mock return time: tomorrow morning relative to the fixed clock.
   snooze: (id) => {
     const target = id ?? get().selectedId;
     if (!target) return;
     set((s) => ({
       conversations: s.conversations.map((c) =>
-        c.id === target ? { ...c, bucket: "waiting" } : c,
+        c.id === target
+          ? { ...c, snoozedUntil: new Date(s.now + 16 * 3600_000).toISOString() }
+          : c,
+      ),
+      audit: pushAudit(
+        s.audit,
+        { actor: "human", surface: "ui", action: "triage.snooze", resource: target, result: "allowed" },
+        s.now,
       ),
     }));
     const first = get().visibleConversations()[0] ?? null;
     set({ selectedId: first?.id ?? null });
   },
 
+  // Priority is Hermes-computed but human-correctable: p cycles the tiers.
   togglePriority: (id) => {
     const target = id ?? get().selectedId;
     if (!target) return;
+    const NEXT = { high: "medium", medium: "normal", normal: "high" } as const;
     set((s) => ({
       conversations: s.conversations.map((c) =>
-        c.id === target
-          ? { ...c, urgency: c.urgency === "high" ? "normal" : "high" }
-          : c,
+        c.id === target ? { ...c, urgency: NEXT[c.urgency] } : c,
+      ),
+    }));
+  },
+
+  // One-tap on the post-send strip: mark done ↔ reopen (back to Sent).
+  flipRouting: () => {
+    const conv = get().selected();
+    if (!conv?.routedAfterSend) return;
+    const next: ThreadStatus = conv.status === "done" ? "sent" : "done";
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === conv.id ? { ...c, status: next } : c,
+      ),
+      audit: pushAudit(
+        s.audit,
+        { actor: "human", surface: "ui", action: `triage.route.${next}`, resource: conv.id, result: "allowed" },
+        s.now,
       ),
     }));
   },
@@ -235,7 +326,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
           const set = anglesFor(c);
-          // Three angled candidates: 1 warm · 2 direct · 3 brief (pick by number key).
+          // Three angled candidates, picked by number key. On a sent (open)
+          // thread these are FOLLOW-UPS (gentle nudge / direct ask / brief
+          // bump) — chasing, not answering.
           const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
             (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: set[tone] }),
           );
@@ -262,7 +355,6 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         const vid = `${c.id}d${c.draft.versions.length + 1}`;
         return {
           ...c,
-          bucket: c.bucket === "needs" ? "drafted" : c.bucket,
           draft: {
             ...c.draft,
             status: "generated",
@@ -434,9 +526,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     set((s) => ({ mobilePane: "thread", composerFocusTick: s.composerFocusTick + 1 }));
   },
 
-  // v0 send = LOCAL MOCK: appends to the thread, honestly labeled, never
-  // delivered. Sending a Hermes-originated draft is the intent gesture that
-  // replaced the approve-intent ceremony (same audit semantics, natural act).
+  // v0 send = LOCAL MOCK append (code-level truth; the UI is diegetic).
+  // Post-send (v5 final): the thread always lands in Sent (open) — Hermes
+  // only SUGGESTS done-vs-open, surfaced as a one-tap strip. Sending a nudge
+  // from a stale sent thread resets its staleness clock, which is exactly
+  // what a chase should do.
   sendMock: () => {
     const conv = get().selected();
     const text = get().composerText.trim();
@@ -445,6 +539,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const fromHermes =
       conv.draft.status === "added_to_chat" ||
       (conv.draft.status === "edited" && !!active);
+    const routed = suggestPostSend(text);
     set((s) => {
       const nowIso = new Date(s.now).toISOString();
       return {
@@ -455,8 +550,8 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           const mid = `${c.id}m${c.messages.length + 1}`;
           return {
             ...c,
-            // You replied — the ball is in their court now.
-            bucket: c.bucket === "needs" || c.bucket === "drafted" ? "waiting" : c.bucket,
+            status: "sent" as const,
+            routedAfterSend: routed,
             unread: false,
             lastActivity: nowIso,
             messages: [
@@ -475,14 +570,18 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           };
         }),
         audit: pushAudit(
-          s.audit,
-          {
-            actor: "human",
-            surface: "ui",
-            action: fromHermes ? "draft.sent_mock" : "message.sent_mock",
-            resource: conv.id,
-            result: "allowed",
-          },
+          pushAudit(
+            s.audit,
+            {
+              actor: "human",
+              surface: "ui",
+              action: fromHermes ? "draft.sent_mock" : "message.sent_mock",
+              resource: conv.id,
+              result: "allowed",
+            },
+            s.now,
+          ),
+          { actor: "hermes", surface: "ui", action: `triage.routed.${routed}`, resource: conv.id, result: "allowed" },
           s.now,
         ),
       };
@@ -494,7 +593,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     set({ loadState: "loading" });
     window.setTimeout(() => {
       set({ loadState: "ready", conversations: CONVERSATIONS });
-      get().setBucket(get().activeBucket);
+      get().setView(get().activeView);
     }, 650);
   },
 
@@ -507,13 +606,24 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 }));
 
+// Shared by every filter setter: merge the patch, then re-anchor selection.
+function applyFilters(
+  set: (partial: Partial<InboxState>) => void,
+  get: () => InboxState,
+  patch: Partial<InboxFilters>,
+) {
+  set({ filters: { ...get().filters, ...patch }, mobilePane: "list", drawerOpen: false });
+  const first = get().visibleConversations()[0] ?? null;
+  set({ selectedId: first?.id ?? null });
+}
+
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────
-// Each thread gets three GENUINELY distinct, thread-aware drafts:
-//   WARM   = relational open + soft commit
-//   DIRECT = answer first, one line, no cushioning
-//   BRIEF  = the shortest honest reply
-// Hand-written sets keyed by conversation id (base fixtures) or by the last
-// incoming body (generator pool snippets, via ANGLES_BY_BODY).
+// Each thread gets three GENUINELY distinct, thread-aware drafts. On a
+// your-turn thread they're REPLIES (warm = relational open + soft commit ·
+// direct = answer first · brief = shortest honest reply). On a sent thread
+// they're FOLLOW-UPS (gentle nudge / direct ask / brief bump). Hand-written
+// sets keyed by conversation id (base fixtures) or by the last message body
+// (generator pool snippets, via ANGLES_BY_BODY / NUDGES_BY_BODY).
 const MOCK_ANGLE_SETS: Record<string, AngleSet> = {
   // Dana: reviewed the deck? + move call to 3pm
   c1: {
@@ -535,14 +645,44 @@ const MOCK_ANGLE_SETS: Record<string, AngleSet> = {
   },
 };
 
-// Last-resort trio (drafting from a bucket whose content has no tailored set).
+// Follow-up trios for the hand-written sent fixtures (nudge, not reply).
+const MOCK_NUDGE_SETS: Record<string, AngleSet> = {
+  // Nadia: does Tuesday still work?
+  c6: {
+    warm: "Hey! Just bumping this — does Tuesday still work? All good if things moved around on your end.",
+    direct: "Confirming Tuesday — yes or no? I'll hold the slot until tomorrow.",
+    brief: "Still good for Tuesday?",
+  },
+  // Tom: promised the one-pager
+  c7: {
+    warm: "No pressure at all — just checking in on the one-pager whenever it's ready. Genuinely looking forward to reading it.",
+    direct: "Following up on the one-pager — can you send whatever you have by Friday?",
+    brief: "Any update on the one-pager?",
+  },
+};
+
+// Last-resort trios (drafting on content that has no tailored set).
 const ANGLE_FALLBACK: AngleSet = {
   warm: "Really glad you flagged this — thank you. Let me give it proper thought today and come back tomorrow with a real answer instead of a rushed one.",
   direct: "Got it. I'll confirm one detail and have an answer for you tomorrow.",
   brief: "On it — answer by tomorrow.",
 };
+const NUDGE_FALLBACK: AngleSet = {
+  warm: "Just floating this back to the top of your inbox — no rush, whenever you get a minute.",
+  direct: "Following up — where does this stand on your end?",
+  brief: "Any update on this?",
+};
 
 function anglesFor(conv: Conversation): AngleSet {
+  const lastMsg = conv.messages[conv.messages.length - 1];
+  if (conv.status === "sent") {
+    // Chasing, not answering: key follow-ups off YOUR last outgoing message.
+    return (
+      MOCK_NUDGE_SETS[conv.id] ??
+      (lastMsg && NUDGES_BY_BODY.get(lastMsg.body)) ??
+      NUDGE_FALLBACK
+    );
+  }
   const byId = MOCK_ANGLE_SETS[conv.id];
   if (byId) return byId;
   const lastIncoming = [...conv.messages].reverse().find((m) => m.direction === "in");

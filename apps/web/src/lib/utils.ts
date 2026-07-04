@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Whole days since the timestamp — staleness math for the Waiting view. */
+export function daysSince(iso: string, now: number): number {
+  return Math.floor((now - new Date(iso).getTime()) / 86_400_000);
+}
+
 /** Compact relative time for dense rows (mock clock is fixed for determinism). */
 export function relTime(iso: string, now: number): string {
   const diff = now - new Date(iso).getTime();

@@ -14,9 +14,10 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
 - **N5 — `z` undo should follow temporal share order.** `unshareLast` currently unshares the last
   shared *incoming message by position*, not the most *recently shared* body. Track share
   timestamps (or an order counter) for true LIFO undo.
-- **N6 — `d` row-teleport feedback.** Drafting from Needs Reply moves the conversation to Drafted;
-  in the list the row silently vanishes from the current bucket. Add a transient cue (row exit
-  animation, toast, or bucket-count pulse) so the move is legible.
+- **N6 — `d` row-teleport feedback.** ~~Drafting from Needs Reply moves the conversation to Drafted;
+  the row silently vanishes.~~ **Mostly resolved by v5 (2026-07-03):** the Drafted bucket is gone;
+  picking an angle keeps the thread in Needs Reply and re-sorts it to the top with a Draft chip — the
+  move is now visible within one list. Residual nit: the re-sort jump itself has no transition cue.
 - **N7 — Ultra-wide app frame.** Message measure is capped (68ch / 720px column), but the app shell
   itself stretches edge-to-edge at 2560+. Consider a max-width frame or a third meta column.
 - **Nit — `r` keybinding conflict with the keyboard contract.** The ux-contract assigns `r` to
@@ -41,8 +42,9 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
   chat exchange with Hermes (with thread context), and send directly from the panel. Send requires
   the full send-path spec (single-use approval, expiry, edit-invalidates) — deliberately absent
   from v0, where approve records intent only.
-- **Bucket taxonomy decision (awaiting Elijah).** Five buckets stand; the ux-contract records a
-  four-bucket proposal (merge FYI+Done into "No action") if the FYI/Done overlap keeps biting.
+- **Bucket taxonomy decision.** ~~Awaiting Elijah; five buckets stand.~~ **DECIDED — v5, 2026-07-03:**
+  three views (Needs Reply / Sent / All); FYI, Done, and the four-bucket proposal are all
+  superseded. See DESIGN.md §3 DECISION v5 and the ux-contract's views section.
 
 ## Phase 0 leftovers (pre-review)
 

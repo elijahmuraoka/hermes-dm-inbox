@@ -34,10 +34,11 @@ const LIFECYCLE_LABEL: Record<DraftStatus, string> = {
   sent_mock: "Sent",
 };
 
-const ANGLE_LABEL: Record<string, string> = {
-  warm: "Warm",
-  direct: "Direct",
-  brief: "Brief",
+// Angle labels follow the thread's status (v5): a needs-reply thread gets
+// reply angles; a sent thread gets follow-up angles — chasing, not answering.
+const ANGLE_LABEL: Record<"reply" | "followup", Record<string, string>> = {
+  reply: { warm: "Warm", direct: "Direct", brief: "Brief" },
+  followup: { warm: "Gentle nudge", direct: "Direct ask", brief: "Brief bump" },
 };
 
 export function HermesDraftPanel({
@@ -55,6 +56,7 @@ export function HermesDraftPanel({
   const draft = c.draft;
   const hasVersion = draft.versions.length > 0;
   const anglesPending = draft.status === "angles_ready" && !!draft.angles;
+  const followup = c.status === "sent"; // drafting here means chasing
 
   const lifecycleLabel =
     draft.status === "iterated"
@@ -118,10 +120,12 @@ export function HermesDraftPanel({
       {!hasVersion && !anglesPending && !drafting && (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-3.5 text-center">
           <p className="max-w-[14.375rem] text-[0.78125rem] text-muted-foreground">
-            Ask Hermes to draft a reply in your voice.
+            {followup
+              ? "Ask Hermes to draft a follow-up in your voice."
+              : "Ask Hermes to draft a reply in your voice."}
           </p>
           <Button variant="primary" size="sm" onClick={() => requestDraft()} disabled={drafting}>
-            <HermesMark className="size-3.5" strokeWidth={2.2} /> Draft reply{" "}
+            <HermesMark className="size-3.5" strokeWidth={2.2} /> {followup ? "Draft follow-up" : "Draft reply"}{" "}
             <Kbd className="ml-0.5 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
               d
             </Kbd>
@@ -159,7 +163,7 @@ export function HermesDraftPanel({
               <Kbd className="mt-0.5">{i + 1}</Kbd>
               <span className="flex min-w-0 flex-col gap-1">
                 <span className="text-[0.65625rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {ANGLE_LABEL[a.tone]}
+                  {ANGLE_LABEL[followup ? "followup" : "reply"][a.tone]}
                 </span>
                 <span className="text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
               </span>

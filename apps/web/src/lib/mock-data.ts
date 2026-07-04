@@ -4,11 +4,11 @@
 // inbox, so hand-written conversations are extended by a deterministic generator.
 import type {
   AuditEvent,
-  Bucket,
   Conversation,
   DraftAngleTone,
   Person,
   SourceId,
+  ThreadStatus,
 } from "./types";
 
 export type AngleSet = Record<DraftAngleTone, string>;
@@ -51,7 +51,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c1",
     personId: "p1",
     source: "imessage",
-    bucket: "needs",
+    status: "needs_reply",
     urgency: "high",
     unread: true,
     lastActivity: iso(7),
@@ -84,8 +84,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c2",
     personId: "p2",
     source: "linkedin",
-    bucket: "needs",
-    urgency: "normal",
+    status: "needs_reply",
+    urgency: "medium",
     unread: true,
     lastActivity: iso(52),
     hermesSuggestion: "Warm intro request; a short yes/no keeps momentum.",
@@ -109,7 +109,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c3",
     personId: "p3",
     source: "x",
-    bucket: "needs",
+    status: "needs_reply",
     urgency: "normal",
     unread: false,
     lastActivity: iso(96),
@@ -134,8 +134,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c4",
     personId: "p4",
     source: "linkedin",
-    bucket: "drafted",
-    urgency: "normal",
+    status: "needs_reply",
+    urgency: "medium",
     unread: false,
     lastActivity: iso(140),
     hermesSuggestion: "Draft ready for your review — declines politely, keeps the door open.",
@@ -167,8 +167,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c5",
     personId: "p5",
     source: "imessage",
-    bucket: "drafted",
-    urgency: "low",
+    status: "needs_reply",
+    urgency: "normal",
     unread: false,
     lastActivity: iso(210),
     hermesSuggestion: "Casual thanks reply drafted; low stakes, send when convenient.",
@@ -210,7 +210,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c6",
     personId: "p6",
     source: "x",
-    bucket: "waiting",
+    status: "sent",
     urgency: "normal",
     unread: false,
     lastActivity: iso(1500),
@@ -235,19 +235,27 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c7",
     personId: "p7",
     source: "linkedin",
-    bucket: "waiting",
-    urgency: "low",
+    status: "sent",
+    urgency: "medium",
     unread: false,
-    lastActivity: iso(2880),
-    hermesSuggestion: "They owe you the one-pager — nothing for you to do until it lands.",
+    lastActivity: iso(4600),
+    hermesSuggestion: "You acknowledged three days ago and the one-pager never came — a nudge would be fair.",
     messages: [
       {
         id: "c7m1",
         authorId: "p7",
         direction: "in",
-        timestamp: iso(2880),
+        timestamp: iso(4650),
         preview: "Will send the one-pager over by end of week.",
         body: "Will send the one-pager over by end of week — thanks for your patience on this.",
+      },
+      {
+        id: "c7m2",
+        authorId: "me",
+        direction: "out",
+        timestamp: iso(4600),
+        preview: "Sounds good — looking forward to it.",
+        body: "Sounds good — looking forward to it.",
       },
     ],
     draft: {
@@ -260,9 +268,9 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c8",
     personId: "p8",
     source: "imessage",
-    bucket: "fyi",
-    urgency: "low",
-    unread: false,
+    status: "done",
+    urgency: "normal",
+    unread: true,
     lastActivity: iso(320),
     hermesSuggestion: "Informational; no reply expected.",
     messages: [
@@ -285,8 +293,8 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c9",
     personId: "p9",
     source: "x",
-    bucket: "fyi",
-    urgency: "low",
+    status: "done",
+    urgency: "normal",
     unread: false,
     lastActivity: iso(600),
     hermesSuggestion: "Shared a link you might find useful; no action needed.",
@@ -310,11 +318,12 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c10",
     personId: "p3",
     source: "imessage",
-    bucket: "done",
-    urgency: "low",
+    status: "done",
+    urgency: "normal",
     unread: false,
     lastActivity: iso(4300),
     hermesSuggestion: "Resolved — you confirmed the details.",
+    routedAfterSend: "done",
     messages: [
       {
         id: "c10m1",
@@ -346,19 +355,31 @@ const BASE_CONVERSATIONS: Conversation[] = [
 const GEN_FIRST = ["Ava", "Noah", "Mia", "Leo", "Zoe", "Kai", "Ivy", "Eli", "Uma", "Rex", "Nia", "Jules", "Lia", "Omar", "Ada", "Ben", "Cleo", "Dev", "Esme", "Finn", "Gus", "Hana", "Iris", "Theo", "June", "Marek", "Sana", "Cole", "Rina", "Vic", "Lena", "Otis", "Pia", "Quinn", "Sol"];
 const GEN_LAST = ["Kim", "Silva", "Novak", "Reyes", "Moss", "Idris", "Park", "Lund", "Vega", "Osei", "Tanaka", "Baum", "Cruz", "Dorn", "Egan", "Frost", "Gill", "Haas", "Ito", "Joly"];
 const GEN_SOURCES: SourceId[] = ["imessage", "linkedin", "x"];
-// Weighted so Needs Reply reads as the workhorse bucket.
-const GEN_BUCKETS: Bucket[] = ["needs", "needs", "drafted", "waiting", "needs", "fyi", "done", "needs", "waiting", "fyi"];
+// Weighted so Needs Reply reads as the workhorse view (v5); withDraft items get
+// a ready Hermes draft, which chips + boosts them within their priority tier.
+const GEN_SPECS: { status: ThreadStatus; withDraft?: boolean }[] = [
+  { status: "needs_reply" },
+  { status: "needs_reply" },
+  { status: "needs_reply", withDraft: true },
+  { status: "sent" },
+  { status: "needs_reply" },
+  { status: "done" },
+  { status: "done" },
+  { status: "needs_reply" },
+  { status: "sent" },
+  { status: "done" },
+];
 
-// Bucket-coherent content (Elijah addendum, 2026-07-03): every snippet belongs
-// to exactly ONE bucket's semantics — a fixture must never plausibly straddle two.
-//   needs   = a direct question TO you (incoming; your court)
-//   waiting = YOUR last message asked for something (outgoing; their court)
-//   fyi     = pure broadcast info, no question, nothing owed either way
-//   done    = closed confirmation, nothing pending
-// Needs-bucket snippets carry their own THREAD-AWARE angle trios (warm =
+// Status-coherent content (v5): every snippet belongs to exactly ONE status's
+// semantics — a fixture must never plausibly straddle two.
+//   needs_reply = a direct question TO you (incoming; your court)
+//   sent        = YOUR last message asked for something (outgoing; open thread)
+//   done      = nobody's court — broadcast info or a closed confirmation
+// Needs-reply snippets carry their own THREAD-AWARE reply trios (warm =
 // relational open + soft commit · direct = answer first · brief = shortest
-// honest reply) — drafting mostly happens here, and thread-blind fallback
-// angles read as broken. Keyed by body text at draft time.
+// honest reply); sent snippets carry FOLLOW-UP trios (gentle nudge /
+// direct ask / brief bump) — drafting on a sent thread means chasing, not
+// answering, and reply-shaped copy there would read as broken.
 const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   {
     body: "Quick one — does the pricing page copy still say early access? Someone asked me today.",
@@ -458,67 +479,91 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
 ];
 
-export const ANGLES_BY_BODY = new Map(NEEDS_ITEMS.map((i) => [i.body, i.angles]));
+// Follow-up trios for sent threads: chase without burning goodwill.
+//   gentle nudge = warm bump, zero pressure · direct ask = deadline or
+//   decision requested · brief bump = the shortest honest poke.
+const SENT_ITEMS: { body: string; nudges: AngleSet }[] = [
+  {
+    body: "Sent the deck over — let me know which direction lands better.",
+    nudges: {
+      warm: "Hey — no rush at all, just keeping this on your radar. Curious which of the two directions felt stronger when you had a look.",
+      direct: "Did either deck direction land for you? I'd like to lock one in this week.",
+      brief: "Any read on the two directions yet?",
+    },
+  },
+  {
+    body: "Just shared the doc with you — flag anything that reads wrong.",
+    nudges: {
+      warm: "Morning! Whenever you get a minute, a quick pass on that doc would be a big help — even a thumbs-up works.",
+      direct: "Have you had a chance to read the doc? I need your flags before I ship it.",
+      brief: "Doc still on your list?",
+    },
+  },
+  {
+    body: "Offer's in your inbox. Take your time, no rush on my end.",
+    nudges: {
+      warm: "Just checking the offer landed OK — happy to walk through any part of it whenever suits you.",
+      direct: "Any questions on the offer? I'd love a yes or no by Friday so I can plan either way.",
+      brief: "Any thoughts on the offer?",
+    },
+  },
+  {
+    body: "Pinged the venue about the 24th — will confirm as soon as they do.",
+    nudges: {
+      warm: "Following up on the 24th — any word from your side? We're starting to plan around it.",
+      direct: "Need the 24th confirmed today — can you get me a yes or no?",
+      brief: "Any word on the 24th?",
+    },
+  },
+  {
+    body: "Draft agenda's with you — add anything before I circulate it.",
+    nudges: {
+      warm: "Circulating the agenda tomorrow morning — want to sneak anything in before it goes out?",
+      direct: "Last call on the agenda — it goes out tomorrow morning as-is unless you add to it.",
+      brief: "Agenda goes out tomorrow — anything to add?",
+    },
+  },
+  {
+    body: "Sent the revised quote over — your move whenever you're ready.",
+    nudges: {
+      warm: "Hope the revised quote made sense — happy to hop on a quick call if any line item needs unpacking.",
+      direct: "Where did we land on the revised quote? If the number works, I can start next week.",
+      brief: "Any verdict on the quote?",
+    },
+  },
+];
 
-const GEN_BY_BUCKET: Record<
-  Bucket,
-  { snippets: string[]; direction: "in" | "out"; suggestion?: string }
-> = {
-  needs: {
-    direction: "in",
-    suggestion: "Open question in the last message; a short reply keeps it moving.",
-    snippets: NEEDS_ITEMS.map((i) => i.body),
-  },
-  drafted: {
-    direction: "in",
-    suggestion: "Draft ready for your review.",
-    snippets: [
-      "Following up on my last note — any thoughts on the proposal?",
-      "Sent over the contract redlines. Two small changes — OK to proceed?",
-      "I owe you an intro to that designer I mentioned. Still interested?",
-    ],
-  },
-  waiting: {
-    direction: "out", // your message closed the turn; the ball is in their court
-    suggestion: "You asked; nothing to do until they answer.",
-    snippets: [
-      "Sent the deck over — let me know which direction lands better.",
-      "Just shared the doc with you — flag anything that reads wrong.",
-      "Offer's in your inbox. Take your time, no rush on my end.",
-      "Pinged the venue about the 24th — will confirm as soon as they do.",
-      "Draft agenda's with you — add anything before I circulate it.",
-      "Sent the revised quote over — your move whenever you're ready.",
-    ],
-  },
-  fyi: {
-    direction: "in",
-    suggestion: "Informational; no reply expected.",
-    snippets: [
-      "Heads up: the API version you're on sunsets at the end of the month.",
-      "New build is up. The keyboard nav feels dramatically better.",
-      "FYI — moved our standup doc to the shared drive, same link structure.",
-      "The panel got moved to the main hall, same start time.",
-      "Office is closed Monday for the holiday — plan around it.",
-      "We renamed the shared channel; you're already in the new one.",
-    ],
-  },
-  done: {
-    direction: "in",
-    suggestion: "Resolved — nothing left to do.",
-    snippets: [
-      "Perfect, that answers it — thanks!",
-      "All sorted on our end. Appreciate the quick turnaround.",
-      "Got it, see you there.",
-      "Confirmed for Thursday — thanks again!",
-      "Payment received — receipt's in the system.",
-    ],
-  },
-};
+export const ANGLES_BY_BODY = new Map(NEEDS_ITEMS.map((i) => [i.body, i.angles]));
+export const NUDGES_BY_BODY = new Map(SENT_ITEMS.map((i) => [i.body, i.nudges]));
+
+// Incoming threads that arrive with a ready draft (chips in Needs Reply).
+const DRAFTED_SNIPPETS = [
+  "Following up on my last note — any thoughts on the proposal?",
+  "Sent over the contract redlines. Two small changes — OK to proceed?",
+  "I owe you an intro to that designer I mentioned. Still interested?",
+];
+
+// "done" = nobody's court: broadcast info + closed confirmations, merged (v5 —
+// FYI and Done are not views; these rows live only in All).
+const DONE_ITEMS: { body: string; suggestion: string }[] = [
+  { body: "Heads up: the API version you're on sunsets at the end of the month.", suggestion: "Informational; no reply expected." },
+  { body: "New build is up. The keyboard nav feels dramatically better.", suggestion: "Informational; no reply expected." },
+  { body: "FYI — moved our standup doc to the shared drive, same link structure.", suggestion: "Informational; no reply expected." },
+  { body: "Perfect, that answers it — thanks!", suggestion: "Resolved — nothing left to do." },
+  { body: "The panel got moved to the main hall, same start time.", suggestion: "Informational; no reply expected." },
+  { body: "All sorted on our end. Appreciate the quick turnaround.", suggestion: "Resolved — nothing left to do." },
+  { body: "Office is closed Monday for the holiday — plan around it.", suggestion: "Informational; no reply expected." },
+  { body: "Got it, see you there.", suggestion: "Resolved — nothing left to do." },
+  { body: "We renamed the shared channel; you're already in the new one.", suggestion: "Informational; no reply expected." },
+  { body: "Confirmed for Thursday — thanks again!", suggestion: "Resolved — nothing left to do." },
+  { body: "Payment received — receipt's in the system.", suggestion: "Resolved — nothing left to do." },
+];
+
 const GEN_DRAFT_TEXT =
   "Thanks for the nudge — I looked through it this morning and it's in good shape. Let me confirm one detail on my end and I'll get you a proper answer by tomorrow.";
 
 const GENERATED_PEOPLE: Record<string, Person> = {};
-const bucketCounters: Record<string, number> = {};
+const statusCounters: Record<string, number> = {};
 const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
   const first = GEN_FIRST[i % GEN_FIRST.length];
   const last = GEN_LAST[(i * 7 + 3) % GEN_LAST.length];
@@ -531,34 +576,60 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
       : `@${first.toLowerCase()}${last.toLowerCase()}`;
   GENERATED_PEOPLE[pid] = P(pid, name, handle);
 
-  const bucket = GEN_BUCKETS[i % GEN_BUCKETS.length];
-  const spec = GEN_BY_BUCKET[bucket];
-  const nth = (bucketCounters[bucket] = (bucketCounters[bucket] ?? 0) + 1);
-  const body = spec.snippets[(nth - 1) % spec.snippets.length];
-  const minAgo = 25 + i * 47 + (i % 5) * 13; // spread over ~28h, deterministic
-  const drafted = bucket === "drafted";
-  const outgoing = spec.direction === "out";
+  const spec = GEN_SPECS[i % GEN_SPECS.length];
+  const { status } = spec;
+  const counterKey = spec.withDraft ? "needs_reply_drafted" : status;
+  const nth = (statusCounters[counterKey] = (statusCounters[counterKey] ?? 0) + 1);
+
+  let body: string;
+  let suggestion: string;
+  let direction: "in" | "out" = "in";
+  if (status === "sent") {
+    body = SENT_ITEMS[(nth - 1) % SENT_ITEMS.length].body;
+    suggestion = "You asked; nothing to do until they answer.";
+    direction = "out"; // your message closed the turn; the thread is open on your side
+  } else if (status === "done") {
+    const item = DONE_ITEMS[(nth - 1) % DONE_ITEMS.length];
+    body = item.body;
+    suggestion = item.suggestion;
+  } else if (spec.withDraft) {
+    body = DRAFTED_SNIPPETS[(nth - 1) % DRAFTED_SNIPPETS.length];
+    suggestion = "Draft ready for your review.";
+  } else {
+    body = NEEDS_ITEMS[(nth - 1) % NEEDS_ITEMS.length].body;
+    suggestion = "Open question in the last message; a short reply keeps it moving.";
+  }
+
+  // Sent threads spread over ~9 days so staleness (>= 3d) actually shows;
+  // everything else stays inside the last ~28h for a lively home view.
+  const minAgo =
+    status === "sent" ? 1400 + (nth - 1) * 1900 : 25 + i * 47 + (i % 5) * 13;
 
   return {
     id: `cg${i}`,
     personId: pid,
     source,
-    bucket,
-    urgency: bucket === "needs" && i % 9 === 0 ? "high" : i % 4 === 0 ? "low" : "normal",
-    unread: bucket === "needs" && i % 3 === 0,
+    status,
+    urgency:
+      status === "needs_reply" && i % 9 === 0
+        ? "high"
+        : status === "needs_reply" && i % 4 === 0
+          ? "medium"
+          : "normal",
+    unread: (status === "needs_reply" && i % 3 === 0) || (status === "done" && i % 7 === 0),
     lastActivity: iso(minAgo),
-    hermesSuggestion: spec.suggestion,
+    hermesSuggestion: suggestion,
     messages: [
       {
         id: `cg${i}m1`,
-        authorId: outgoing ? "me" : pid,
-        direction: spec.direction,
+        authorId: direction === "out" ? "me" : pid,
+        direction,
         timestamp: iso(minAgo),
         preview: body.length > 64 ? `${body.slice(0, 61)}…` : body,
         body,
       },
     ],
-    draft: drafted
+    draft: spec.withDraft
       ? {
           status: "generated" as const,
           modelLocality: "mock" as const,

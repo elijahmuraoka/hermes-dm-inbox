@@ -6,9 +6,23 @@
 
 export type SourceId = "imessage" | "linkedin" | "x";
 
-export type Bucket = "needs" | "drafted" | "waiting" | "fyi" | "done";
+// A thread's resting state: needs_reply = waiting on you; sent = you replied,
+// open until they respond (your side of the net); done = closed — handled
+// threads AND no-reply-expected broadcasts. Done surfaces in All, and in
+// Sent behind its "Show done" toggle when the last word was yours.
+export type ThreadStatus = "needs_reply" | "sent" | "done";
 
-export type Urgency = "high" | "normal" | "low";
+// v5 final (Elijah, 2026-07-03): the five buckets collapsed to three VIEWS —
+// NEEDS REPLY / SENT / ALL. Familiar names won over the turn-based pair; the
+// one novel move is Sent-as-open-threads with done hidden behind a toggle.
+export type ViewId = "needs_reply" | "sent" | "all";
+
+/** A sent thread this quiet (days since last activity) needs a follow-up —
+    it groups to the top of Sent and grows a nudge affordance. */
+export const STALE_DAYS = 3;
+
+// Hermes-computed priority: red dot high · amber dot medium · empty normal.
+export type Urgency = "high" | "medium" | "normal";
 
 // Composer-first lifecycle (Elijah, 2026-07-03 v3+v4): drafts are PREFILLS,
 // iterated conversationally in the drafting studio. "Add to chat" drops the
@@ -77,11 +91,18 @@ export interface Conversation {
   id: string;
   personId: string;
   source: SourceId;
-  bucket: Bucket;
+  status: ThreadStatus;
   urgency: Urgency;
   unread: boolean;
   lastActivity: string; // ISO
   hermesSuggestion?: string; // one-line triage rationale
+  // Post-send routing (v5 final): sending always lands the thread in Sent
+  // (open); Hermes only SUGGESTS done-vs-open. This records the suggestion so
+  // the thread can show the one-tap strip (Mark done / Reopen).
+  routedAfterSend?: ThreadStatus;
+  // Snoozed threads hide from the working views until this time (v5: snooze
+  // is not a view — just a small rail count while hidden; All still shows them).
+  snoozedUntil?: string; // ISO
   messages: Message[];
   draft: Draft;
 }
@@ -96,42 +117,30 @@ export interface AuditEvent {
   result: "allowed" | "denied" | "error";
 }
 
-// Bucket semantics (Elijah addendum, 2026-07-03): names must carry the model —
-// whose court is the ball in? `desc` renders under the list header so the
-// distinction is self-evident, not tribal knowledge.
-export const BUCKET_META: Record<
-  Bucket,
+// View semantics (v5 REVISION final, Elijah): NEEDS REPLY / SENT / ALL —
+// familiar names won over the turn-based pair. `desc` renders under the list
+// header so each view's job is self-evident.
+export const VIEW_META: Record<
+  ViewId,
   { label: string; desc: string; key: string; token: string }
 > = {
-  needs: {
+  needs_reply: {
     label: "Needs Reply",
-    desc: "The ball is in your court",
-    key: "g i",
-    token: "var(--bucket-needs)",
+    desc: "Waiting on you — sorted by priority",
+    key: "g n",
+    token: "var(--view-needs-reply)",
   },
-  drafted: {
-    label: "Drafted",
-    desc: "Hermes drafted — review and approve",
-    key: "g d",
-    token: "var(--bucket-drafted)",
+  sent: {
+    label: "Sent",
+    desc: "You replied — open until they respond",
+    key: "g s",
+    token: "var(--view-sent)",
   },
-  waiting: {
-    label: "Waiting on them",
-    desc: "You acted; the ball is in their court",
-    key: "",
-    token: "var(--bucket-waiting)",
-  },
-  fyi: {
-    label: "FYI",
-    desc: "No reply expected — read and move on",
-    key: "",
-    token: "var(--bucket-fyi)",
-  },
-  done: {
-    label: "Done",
-    desc: "Handled — nothing left to do",
-    key: "",
-    token: "var(--bucket-done)",
+  all: {
+    label: "All",
+    desc: "Everything, newest first",
+    key: "g a",
+    token: "var(--view-all)",
   },
 };
 

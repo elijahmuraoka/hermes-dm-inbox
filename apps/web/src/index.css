@@ -41,12 +41,16 @@
   --sidebar-border: oklch(0.2 0.02 260 / 8%);
   --sidebar-ring: oklch(0.55 0.15 235 / 45%);
 
-  /* Inbox semantic tokens */
-  --bucket-needs: oklch(0.55 0.15 235);
-  --bucket-drafted: oklch(0.56 0.14 285); /* soft violet-blue */
-  --bucket-waiting: oklch(0.68 0.14 75); /* amber */
-  --bucket-fyi: oklch(0.6 0.02 260); /* slate/muted */
-  --bucket-done: oklch(0.6 0.14 150); /* green */
+  /* Inbox semantic tokens (v5 final: three views — Needs Reply / Sent / All —
+     not five buckets). Sent moved OFF amber: amber belongs to Hermes presence
+     alone (v4), and a second amber meaning "open thread" would fork it. The
+     MEDIUM-PRIORITY dot deliberately uses --hermes: priority is Hermes's
+     triage voice — presence, not sharing. */
+  --view-needs-reply: oklch(0.55 0.15 235); /* cyan — home, the work */
+  --view-sent: oklch(0.6 0.14 150); /* green — your side of the net */
+  --view-all: oklch(0.6 0.02 260); /* slate — the neutral ledger */
+  --draft-ready: oklch(0.5 0.14 285); /* violet — a Hermes draft awaits */
+  --status-ok: oklch(0.6 0.14 150);
   --urgency-high: oklch(0.58 0.19 27);
   --status-unread: oklch(0.55 0.15 235);
 
@@ -88,11 +92,11 @@
   --sidebar-border: oklch(1 0 0 / 6%);
   --sidebar-ring: oklch(0.78 0.13 230 / 55%);
 
-  --bucket-needs: oklch(0.78 0.13 230);
-  --bucket-drafted: oklch(0.68 0.12 288);
-  --bucket-waiting: oklch(0.78 0.13 78);
-  --bucket-fyi: oklch(0.68 0.014 255);
-  --bucket-done: oklch(0.72 0.15 152);
+  --view-needs-reply: oklch(0.78 0.13 230);
+  --view-sent: oklch(0.72 0.15 152);
+  --view-all: oklch(0.68 0.014 255);
+  --draft-ready: oklch(0.72 0.12 288);
+  --status-ok: oklch(0.72 0.15 152);
   --urgency-high: oklch(0.68 0.19 25);
   --status-unread: oklch(0.78 0.13 230);
 
@@ -140,11 +144,11 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-bucket-needs: var(--bucket-needs);
-  --color-bucket-drafted: var(--bucket-drafted);
-  --color-bucket-waiting: var(--bucket-waiting);
-  --color-bucket-fyi: var(--bucket-fyi);
-  --color-bucket-done: var(--bucket-done);
+  --color-view-needs-reply: var(--view-needs-reply);
+  --color-view-sent: var(--view-sent);
+  --color-view-all: var(--view-all);
+  --color-draft-ready: var(--draft-ready);
+  --color-status-ok: var(--status-ok);
   --color-urgency-high: var(--urgency-high);
   --color-status-unread: var(--status-unread);
 
@@ -202,6 +206,14 @@
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+}
+
+/* One-line chip rails (filter bar) scroll without showing a scrollbar. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* Scrollbars — quiet, operator. */

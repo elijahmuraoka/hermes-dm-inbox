@@ -1,5 +1,6 @@
 import { CheckCircle2, Inbox, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ViewId } from "@/lib/types";
 
 /** Row skeleton — matches the locked ledger row (h-10 single-line) so there is no shift. */
 export function RowSkeleton() {
@@ -24,8 +25,25 @@ export function ListSkeleton() {
   );
 }
 
-/** Calm empty state — not a sad illustration (DESIGN §5.8). */
-export function EmptyBucket({ label }: { label: string }) {
+const EMPTY_COPY: Record<ViewId, { title: string; body: string }> = {
+  needs_reply: {
+    title: "You're all caught up",
+    body: "Nothing is waiting on you right now. Enjoy the quiet.",
+  },
+  sent: {
+    title: "No open threads",
+    body: "Everything you've sent has been answered or closed.",
+  },
+  all: {
+    title: "No conversations",
+    body: "When threads arrive, every one of them lives here.",
+  },
+};
+
+/** Calm empty state — not a sad illustration (DESIGN §5.8). When filters are
+    the reason the list is empty, say so — a silently filtered blank would lie. */
+export function EmptyView({ view, filtered }: { view: ViewId; filtered: boolean }) {
+  const copy = EMPTY_COPY[view];
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
       <div
@@ -34,9 +52,13 @@ export function EmptyBucket({ label }: { label: string }) {
       >
         <CheckCircle2 className="size-5" strokeWidth={2} />
       </div>
-      <p className="text-[0.8125rem] font-medium text-foreground">{label} is clear</p>
+      <p className="text-[0.8125rem] font-medium text-foreground">
+        {filtered ? "No matches" : copy.title}
+      </p>
       <p className="max-w-[15rem] text-[0.75rem] text-muted-foreground">
-        Nothing needs you here right now. Move on with a calm inbox.
+        {filtered
+          ? "Active filters are hiding everything here. Clear them from the chips above or ⌘K."
+          : copy.body}
       </p>
     </div>
   );

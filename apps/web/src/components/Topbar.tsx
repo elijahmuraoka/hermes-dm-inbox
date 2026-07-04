@@ -10,11 +10,11 @@ export function Topbar() {
 
   return (
     <header className="flex h-11 min-w-0 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
-      {/* Mobile (<md): hamburger opens the bucket/source drawer. */}
+      {/* Mobile (<md): hamburger opens the view/source drawer. */}
       <button
         type="button"
         onClick={() => setDrawer(true)}
-        aria-label="Open buckets and sources"
+        aria-label="Open views and sources"
         className="-ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
       >
         <Menu className="size-4" />
@@ -32,11 +32,12 @@ export function Topbar() {
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
         <span className="flex items-center gap-1.5 text-[0.71875rem] text-muted-foreground">
+          {/* In-flight is neutral slate, not amber — amber = Hermes presence only. */}
           <span
             className="size-1.5 rounded-full"
             style={{
-              background: synced ? "var(--bucket-done)" : "var(--bucket-waiting)",
-              boxShadow: synced ? "0 0 6px var(--bucket-done)" : "0 0 6px var(--bucket-waiting)",
+              background: synced ? "var(--status-ok)" : "var(--view-all)",
+              boxShadow: synced ? "0 0 6px var(--status-ok)" : "0 0 6px var(--view-all)",
             }}
           />
           {synced ? "Synced" : "Syncing…"}

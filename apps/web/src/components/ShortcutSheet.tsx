@@ -8,8 +8,9 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
       ["⌘K", "Command palette"],
       ["/", "Search"],
       ["?", "This help"],
-      ["g i", "Go to inbox (Needs Reply)"],
-      ["g d", "Go to Drafted"],
+      ["g n", "Go to Needs Reply"],
+      ["g s", "Go to Sent"],
+      ["g a", "Go to All"],
     ],
   },
   {
@@ -24,15 +25,15 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
     title: "Triage",
     rows: [
       ["e", "Mark done (or Add to chat when a draft is picked)"],
-      ["s", "Snooze → Waiting on them"],
+      ["s", "Snooze (hidden until it returns)"],
       ["p", "Toggle priority"],
     ],
   },
   {
     title: "Hermes & composer",
     rows: [
-      ["d", "Draft reply with Hermes"],
-      ["1 2 3", "Pick a draft angle (warm / direct / brief)"],
+      ["d", "Draft reply — a follow-up on Sent threads"],
+      ["1 2 3", "Pick a draft angle"],
       ["e", "Add picked draft to chat"],
       ["c", "Focus composer"],
       ["⌘⏎", "Send message"],
