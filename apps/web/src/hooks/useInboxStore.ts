@@ -408,7 +408,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   requestDraft: () => {
     const conv = get().selected();
-    if (!conv) return;
+    // Same guard as done/snooze: a row mid-exit is already leaving — don't
+    // start drafting on it in the commit window.
+    if (!conv || get().exitingIds.includes(conv.id)) return;
     // Drafting means Hermes reads the thread — full stop, no badges, no
     // switches (Elijah v4). lifecycle: requested → angles_ready → pick 1/2/3.
     // Open the sheet too: below xl the side panel doesn't exist, and a state

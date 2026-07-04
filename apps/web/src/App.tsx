@@ -139,7 +139,12 @@ export default function App() {
 function HintBar() {
   const dismissHint = useInboxStore((s) => s.dismissHint);
   return (
-    <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-muted/20 px-3 text-[0.6875rem] text-muted-foreground">
+    // role="status": advisory line, announced politely, and inside the
+    // landmark structure for axe's region rule.
+    <div
+      role="status"
+      className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-muted/20 px-3 text-[0.6875rem] text-muted-foreground"
+    >
       <span className="flex items-center gap-1 truncate">
         Press <Kbd>?</Kbd> for shortcuts · <Kbd>j</Kbd>
         <Kbd>k</Kbd> to move

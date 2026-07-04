@@ -189,17 +189,24 @@ function ConversationRowImpl({ conversation: c, view, selected, exiting, now, on
 
       {/* v7 hover actions — Superhuman-style: the time slot becomes the verb
           slot. Solid backdrop matches the hovered/selected row wash so the
-          preview never bleeds through underneath. */}
+          preview never bleeds through underneath; the leading edge is a
+          gradient ramp so covered glyphs fade out instead of hard-cropping
+          mid-letter (ship-fix: "DRAFT" read "DF" at the seam). */}
       <span
         className={cn(
-          "absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md px-0.5",
+          "absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 px-0.5",
           "pointer-events-none opacity-0 transition-opacity duration-[120ms] group-hover:pointer-events-auto group-hover:opacity-100",
+          "before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-8",
+          "before:bg-[linear-gradient(to_left,var(--row-wash),transparent)]",
         )}
-        style={{
-          background: selected
-            ? "color-mix(in oklab, var(--primary) 10%, var(--background))"
-            : "color-mix(in oklab, var(--accent) 25%, var(--background))",
-        }}
+        style={
+          {
+            "--row-wash": selected
+              ? "color-mix(in oklab, var(--primary) 10%, var(--background))"
+              : "color-mix(in oklab, var(--accent) 25%, var(--background))",
+            background: "var(--row-wash)",
+          } as React.CSSProperties
+        }
       >
         <RowAction
           label={fyi ? "Acknowledge · e" : "Mark done · e"}
