@@ -2,6 +2,26 @@
 
 Deferred items, with provenance. Phase 0 = mock UI slice; Phase 1 = first real backend/sync work.
 
+## Polish — from Elijah's v6 pressure-test (2026-07-04, non-blocking)
+
+F1 (title count vs rail disagreement while FYI folded) was fixed pre-ship; the rest were accepted
+as polish so they aren't lost:
+
+- **F2 — rail counts don't blank at `?state=error`.** The list header shows an honest "—" when a
+  sync error means counts can't be vouched for, but the rail still renders numbers. Same rule
+  should apply to ViewNav.
+- **F3 — unread dot ignores the source filter.** `count()` respects the active source filter;
+  `unread()` doesn't, so the rail's unread dot can claim unread that the filtered view won't show.
+- **F4 — fixture triage-voice credibility.** Generator urgency is mechanical (`i % 9` / `i % 4`),
+  which creates implausible pairs (a high-priority dot on a casual note next to a normal-priority
+  contract question). Make urgency assignments content-plausible so Hermes's triage voice reads
+  credible in demos.
+- **F5 — FYI collapse not persisted.** The fold resets on reload; persist it (localStorage).
+- **F6 — (documented in DESIGN.md §5.2) both-sections-empty renders ONE view-level empty state**
+  rather than two per-section empties — accepted as better than the literal per-section spec.
+- **F7 — mobile post-send stays on the thread** rather than returning to the list. Reasonable
+  divergence (the routing strip needs to be seen); documented as intended.
+
 ## Phase 1 — carried from the 2026-07-03 adversarial UI review
 
 Findings N1–N3 were fixed in Phase 0 (approve guard, mutation→sheet feedback class fix, phantom

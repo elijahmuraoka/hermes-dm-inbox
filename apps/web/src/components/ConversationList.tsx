@@ -69,9 +69,14 @@ export function ConversationList() {
       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-b border-border px-4 py-1.5">
         <h2 className="flex items-center gap-2 text-[0.78125rem] font-semibold tracking-[-0.01em]">
           {VIEW_META[activeView].label}
-          {/* An errored sync can't vouch for a count — show unknown, not stale. */}
+          {/* An errored sync can't vouch for a count — show unknown, not stale.
+              The FYI fold is display-only: folded rows stay in the view's
+              population, so the title count must agree with the rail (F1). */}
           <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[0.65625rem] tabular-nums text-muted-foreground">
-            {loadState === "error" ? "—" : list.length}
+            {loadState === "error"
+              ? "—"
+              : list.length +
+                (activeView === "important" && grouped && fyiCollapsed ? fyiMatching : 0)}
           </span>
         </h2>
         {/* One-line semantics so the view model is self-evident (v5). */}

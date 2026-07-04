@@ -214,7 +214,9 @@ Each ships with **all states** — default · hover · focus-visible · selected
    sort bite on every view, so they must be visible on every view. In Sent, a subtle **"Show done"
    toggle** with an honest count sits at the top of the list. In Important (v6), the two section
    headers render even when a section is empty (each with a calm one-line empty state); the **FYI
-   header is the fold control** — chevron + honest count stay visible while its rows hide.
+   header is the fold control** — chevron + honest count stay visible while its rows hide. When BOTH
+   sections are empty, the view renders one view-level empty state, not two hollow section shells
+   (pressure-test F6: accepted as better than the literal per-section spec).
 3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message or
    thread-level privacy chrome — v4). The Hermes strip carries only the triage rationale, with the HERMES
    label in presence amber.
