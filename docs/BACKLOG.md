@@ -24,6 +24,10 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
   sync/refresh globally and regenerate when draft-focused; the slice binds `r` only to regenerate.
   The phantom "Sync all sources" palette command was deleted (honesty guardrail). When real mock
   sync lands, implement it and resolve the `r` scoping (contextual binding or a new key).
+- **Nit — no keyboard path to archive a drafted thread** (spot-check note, 2026-07-03). On a
+  drafted thread `e` = add-to-chat wins over archive — correct priority, but the only way to mark
+  a drafted thread done is the palette/mouse. Add a dedicated key (e.g. `shift+E`) for
+  archive-regardless-of-draft.
 - **Nit — connector settings surface** (contract): source health/last-sync/capabilities screen —
   not started in the slice.
 - **Nit — audit/share log surface** (`g a`): audit events are recorded in the store but there is no
