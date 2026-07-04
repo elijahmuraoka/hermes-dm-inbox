@@ -149,9 +149,13 @@ function Composer() {
 
   // focusComposer()/addToChat() bump the tick → we take focus on the NEXT
   // frame, after the triggering keydown's default processing has finished —
-  // the hotkey character must never leak into the textarea.
+  // the hotkey character must never leak into the textarea. Compare against
+  // the last-SEEN tick, not zero: a Composer remounting (selection cleared →
+  // restored) with an old nonzero tick must not steal focus on mount.
+  const seenTick = useRef(focusTick);
   useEffect(() => {
-    if (focusTick === 0) return;
+    if (focusTick === seenTick.current) return;
+    seenTick.current = focusTick;
     const raf = requestAnimationFrame(() => ref.current?.focus());
     return () => cancelAnimationFrame(raf);
   }, [focusTick]);
@@ -197,7 +201,13 @@ function Composer() {
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
-                sendMock();
+                // Blocker #1: a send RETURNS you to list scope. Leaving focus
+                // in the emptied textarea trapped every hotkey after ⌘Enter
+                // (g/j/e typed as literal text; a stray ⌘Enter would send it).
+                if (composerText.trim()) {
+                  sendMock();
+                  e.currentTarget.blur();
+                }
               } else if (e.key === "Escape") {
                 // return to list scope: blur so j/k/global keys take over
                 e.currentTarget.blur();
@@ -240,11 +250,14 @@ function MessageBubble({ message: m, now }: { message: Message; now: number }) {
         </span>
       </div>
 
+      {/* Blocker #2: mix in OKLAB (rectangular), not oklch — polar hue
+          interpolation from primary (h≈245) to light --card white (h=0)
+          sweeps through magenta and rendered the bubbles PINK. */}
       <div
         className={cn(
           "max-w-[min(85%,68ch)] rounded-xl border px-3 py-2 text-[0.8125rem] leading-relaxed",
           mine
-            ? "border-primary/25 bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
+            ? "border-primary/25 bg-[color-mix(in_oklab,var(--primary)_12%,var(--card))]"
             : "border-border bg-card",
         )}
       >

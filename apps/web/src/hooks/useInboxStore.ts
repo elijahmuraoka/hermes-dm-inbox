@@ -52,7 +52,7 @@ interface InboxState {
   drawerOpen: boolean; // mobile (<md) hamburger drawer holding the view/source rail
   paletteOpen: boolean;
   shortcutsOpen: boolean;
-  drafting: boolean;
+  draftingId: string | null; // conversation Hermes is generating for — per-thread, never global (#4)
 
   // composer — the ONE editing surface (drafts are prefills, not editors)
   composerText: string;
@@ -152,7 +152,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   drawerOpen: false,
   paletteOpen: false,
   shortcutsOpen: false,
-  drafting: false,
+  draftingId: null,
   composerText: "",
   composerAttach: false,
   composerFocusTick: 0,
@@ -235,6 +235,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   markDone: (id) => {
     const target = id ?? get().selectedId;
     if (!target) return;
+    // Serial triage: remember where we were so selection can ADVANCE to the
+    // next row (Superhuman behavior) — yanking to the top made mid-list
+    // triage unusable (pressure-test blocker #3).
+    const beforeIdx = get()
+      .visibleConversations()
+      .findIndex((c) => c.id === target);
     set((s) => ({
       conversations: s.conversations.map((c) =>
         c.id === target ? { ...c, status: "done" as const, unread: false } : c,
@@ -245,8 +251,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         s.now,
       ),
     }));
-    const first = get().visibleConversations()[0] ?? null;
-    set({ selectedId: first?.id ?? null });
+    advanceSelection(set, get, beforeIdx);
   },
 
   // Snooze (v5): hide from the working views until it returns — status is
@@ -255,6 +260,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   snooze: (id) => {
     const target = id ?? get().selectedId;
     if (!target) return;
+    const beforeIdx = get()
+      .visibleConversations()
+      .findIndex((c) => c.id === target);
     set((s) => ({
       conversations: s.conversations.map((c) =>
         c.id === target
@@ -267,8 +275,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         s.now,
       ),
     }));
-    const first = get().visibleConversations()[0] ?? null;
-    set({ selectedId: first?.id ?? null });
+    advanceSelection(set, get, beforeIdx);
   },
 
   // Priority is Hermes-computed but human-correctable: p cycles the tiers.
@@ -308,7 +315,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // Open the sheet too: below xl the side panel doesn't exist, and a state
     // mutation with no visible feedback is a contract violation.
     set((s) => ({
-      drafting: true,
+      draftingId: conv.id,
       draftSheetOpen: true,
       conversations: s.conversations.map((c) =>
         c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
@@ -322,7 +329,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
     window.setTimeout(() => {
       set((s) => ({
-        drafting: false,
+        // Clear only OUR generation marker — a draft started on another
+        // thread in the meantime keeps its own spinner.
+        draftingId: s.draftingId === conv.id ? null : s.draftingId,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
           const set = anglesFor(c);
@@ -391,7 +400,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const userMsg: DraftChatMsg = { id: `${conv.id}ch${(conv.draft.chat?.length ?? 0) + 1}`, role: "user", text };
     // N2 class: every draft mutation opens its feedback surface (sheet <xl).
     set((s) => ({
-      drafting: true,
+      draftingId: conv.id,
       draftSheetOpen: true,
       conversations: s.conversations.map((c) =>
         c.id === conv.id
@@ -401,7 +410,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
     window.setTimeout(() => {
       set((s) => ({
-        drafting: false,
+        draftingId: s.draftingId === conv.id ? null : s.draftingId,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
           const vid = `${c.id}d${c.draft.versions.length + 1}`;
@@ -617,6 +626,21 @@ function applyFilters(
   set({ selectedId: first?.id ?? null });
 }
 
+// After a triage action removes a row from the view, select the row that now
+// occupies its slot (i.e. the NEXT one down) — never the top. If the row is
+// still visible (e.g. mark-done in All), the selection doesn't move at all.
+function advanceSelection(
+  set: (partial: Partial<InboxState>) => void,
+  get: () => InboxState,
+  beforeIdx: number,
+) {
+  const after = get().visibleConversations();
+  if (after.some((c) => c.id === get().selectedId)) return;
+  const next = after[Math.min(Math.max(beforeIdx, 0), after.length - 1)] ?? null;
+  // Composer is per-thread: a selection move clears it, same as j/k.
+  set({ selectedId: next?.id ?? null, composerText: "", composerAttach: false });
+}
+
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────
 // Each thread gets three GENUINELY distinct, thread-aware drafts. On a
 // your-turn thread they're REPLIES (warm = relational open + soft commit ·
@@ -700,7 +724,14 @@ function applyInstruction(text: string, instruction: string): { text: string; ac
     return { text: t, ack: "Warmed it up." };
   }
   if (/(short|brief|tight|trim|concise)/.test(r)) {
-    return { text: sentences[0] ?? text, ack: "Tightened it to the essentials." };
+    // Guard (#6): never gut the draft to a bare greeting ("Dana!") — keep
+    // sentences until the result carries real content.
+    let t = "";
+    for (const s of sentences) {
+      t = t ? `${t} ${s}` : s;
+      if (t.length >= 40) break;
+    }
+    return { text: t || text, ack: "Tightened it to the essentials." };
   }
   if (/(direct|blunt|straight)/.test(r)) {
     const t = text

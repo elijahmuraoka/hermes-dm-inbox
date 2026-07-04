@@ -30,7 +30,11 @@ export function useKeyboard() {
         if (st.paletteOpen) st.setPalette(false);
         else if (st.shortcutsOpen) st.setShortcuts(false);
         else if (st.drawerOpen) st.setDrawer(false);
-        else if (st.draftSheetOpen) st.setDraftSheet(false);
+        // The sheet only exists below xl — at desktop the studio is the side
+        // panel and the sheet state is dormant; Esc must never burn a press
+        // on an invisible layer (pressure-test nit).
+        else if (st.draftSheetOpen && !window.matchMedia("(min-width: 1280px)").matches)
+          st.setDraftSheet(false);
         return;
       }
       if (st.paletteOpen) return; // palette owns keys while open

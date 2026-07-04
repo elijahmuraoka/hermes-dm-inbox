@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { ViewNav } from "@/components/ViewNav";
@@ -11,6 +11,20 @@ import { ShortcutSheet } from "@/components/ShortcutSheet";
 import { NoSelection } from "@/components/StatusStates";
 import { cn } from "@/lib/utils";
 
+/** ONE mechanism decides which draft surface exists (pressure-test nit):
+    CSS-hiding kept the losing surface mounted — duplicate DOM for probes and
+    a dead Esc at desktop. JS unmounts it instead. */
+function useIsXl() {
+  const [xl, setXl] = useState(() => window.matchMedia("(min-width: 1280px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const onChange = (e: MediaQueryListEvent) => setXl(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return xl;
+}
+
 export default function App() {
   useKeyboard();
   const loadState = useInboxStore((s) => s.loadState);
@@ -21,6 +35,7 @@ export default function App() {
   const drawerOpen = useInboxStore((s) => s.drawerOpen);
   const setDrawer = useInboxStore((s) => s.setDrawer);
   const setView = useInboxStore((s) => s.setView);
+  const isXl = useIsXl();
 
   // Mock initial sync → ready, then select the first row (shows skeletons briefly).
   // Dev/demo: ?state=empty and ?state=error land on those states instead, so the
@@ -73,9 +88,10 @@ export default function App() {
           </div>
 
           {/* Draft panel — persistent side rail at xl+ (rail+list+thread+panel
-              needs the room); below xl it's the bottom sheet. */}
-          {selected && (
-            <div className="hidden xl:flex">
+              needs the room); below xl it's the bottom sheet. Exactly ONE of
+              the two surfaces is mounted at a time (useIsXl). */}
+          {selected && isXl && (
+            <div className="flex">
               <HermesDraftPanel conversation={selected} />
             </div>
           )}
@@ -87,9 +103,9 @@ export default function App() {
 
       {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
           thread's Draft button, or any draft request. Never a silent mutation. */}
-      {selected && draftSheetOpen && (
+      {selected && draftSheetOpen && !isXl && (
         <div
-          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm xl:hidden"
+          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm"
           onClick={() => setDraftSheet(false)}
         >
           <div

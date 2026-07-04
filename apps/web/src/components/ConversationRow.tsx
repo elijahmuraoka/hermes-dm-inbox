@@ -107,8 +107,13 @@ function ConversationRowImpl({ conversation: c, view, selected, now, onClick }: 
         </span>
       )}
 
-      <span className="min-w-0 flex-1 truncate text-[0.75rem] text-muted-foreground">
-        {lastMsg?.preview}
+      {/* #5: below a few ch the preview is an orphan letter ("S…") — collapse
+          it entirely instead of crushing. The flex-1 wrapper still absorbs the
+          free space so the time column stays pinned right. */}
+      <span className="@container min-w-0 flex-1">
+        <span className="hidden truncate text-[0.75rem] text-muted-foreground @[2rem]:block">
+          {lastMsg?.preview}
+        </span>
       </span>
 
       {/* Sent view: the nudge affordance appears once a thread goes stale —
