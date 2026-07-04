@@ -9,6 +9,7 @@ import type {
   Person,
   SourceId,
   ThreadStatus,
+  Urgency,
 } from "./types";
 
 export type AngleSet = Record<DraftAngleTone, string>;
@@ -487,9 +488,19 @@ const GEN_SPECS: {
 // honest reply); sent snippets carry FOLLOW-UP trios (gentle nudge /
 // direct ask / brief bump) — drafting on a sent thread means chasing, not
 // answering, and reply-shaped copy there would read as broken.
-const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
+// Urgency is hand-assigned per body (F4): deadlines and blockers rank high or
+// medium, curiosity and congratulations stay normal — the dots must read like
+// a triage judgment, not a dice roll. `suggestion` overrides the generic
+// rationale where the urgency needs the triage voice to say why.
+const NEEDS_ITEMS: {
+  body: string;
+  angles: AngleSet;
+  urgency: Urgency;
+  suggestion?: string;
+}[] = [
   {
     body: "Quick one — does the pricing page copy still say early access? Someone asked me today.",
+    urgency: "medium",
     angles: {
       warm: "Good catch — and thanks for flagging it. Checking the live copy right now; I'll confirm within the hour.",
       direct: "Yes, it still says early access — updating it today.",
@@ -498,6 +509,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "We're finalizing the panel lineup this week. Are you in if it's the 24th?",
+    urgency: "medium",
     angles: {
       warm: "Honored to be asked — the 24th works on my end. Count me in, and send over whatever prep you need.",
       direct: "Yes to the 24th. Send the format and my slot.",
@@ -506,6 +518,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Loved the write-up. One question about the sync engine — is it CRDT-based or op-log?",
+    urgency: "normal",
     angles: {
       warm: "Thank you — really glad it landed. It's op-log under the hood; happy to walk through why we passed on CRDTs if that's useful.",
       direct: "Op-log, not CRDT — deterministic replay mattered more than concurrent merge.",
@@ -514,6 +527,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Can you resend the invite? It went to my old address.",
+    urgency: "medium",
     angles: {
       warm: "Of course — just resent it to this address. Shout if it doesn't land in a few minutes.",
       direct: "Resent to this address just now.",
@@ -522,6 +536,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Saw the launch — congrats! How's the first week looking?",
+    urgency: "normal",
     angles: {
       warm: "Thank you! Week one has been wild in the best way — signups ahead of plan. Let's catch up properly soon.",
       direct: "Strong — ahead of plan on signups. Retention read comes next week.",
@@ -530,6 +545,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Are you around Thursday afternoon for a quick call about the roadmap?",
+    urgency: "normal",
     angles: {
       warm: "Thursday afternoon works — anytime after 2. Looking forward to it.",
       direct: "Yes — Thursday after 2pm. Send an invite.",
@@ -538,6 +554,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "The venue needs a headcount by Friday — can you confirm yours?",
+    urgency: "medium",
     angles: {
       warm: "Thanks for staying on top of this — I'll be there, plus one. Confirming now so you're set well before Friday.",
       direct: "Confirmed: two from my side.",
@@ -546,6 +563,8 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Did the contract come back from legal yet? We'd like to sign this week.",
+    urgency: "high",
+    suggestion: "They want to sign this week — the contract is the blocker.",
     angles: {
       warm: "Appreciate the patience on this — legal returned it this morning with two minor notes. Clean version to you tomorrow so you can sign this week.",
       direct: "Back from legal today, two minor notes. Clean copy tomorrow — signing this week works.",
@@ -554,6 +573,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "What's the best way to cite your local-first talk in our internal doc?",
+    urgency: "normal",
     angles: {
       warm: "That's kind of you to ask — a link to the recording plus the talk title and my name is perfect. Glad it's useful internally!",
       direct: "Link the recording + title + my name. No other permission needed.",
@@ -562,6 +582,8 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "We hit the rate limit on the staging key — can you bump it?",
+    urgency: "high",
+    suggestion: "Their team is blocked on the staging key right now.",
     angles: {
       warm: "Sorry you hit that wall — bumping the staging key's limit now. Give it ten minutes and you should be clear.",
       direct: "Bumped to 10x — live in ten minutes.",
@@ -570,6 +592,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Is the beta open to teams yet, or individuals only?",
+    urgency: "normal",
     angles: {
       warm: "Great question — individuals only for another couple of weeks, but send me a team size and I'll put you at the top of the list.",
       direct: "Individuals only for now. Teams open in ~2 weeks — I can waitlist yours today.",
@@ -578,6 +601,7 @@ const NEEDS_ITEMS: { body: string; angles: AngleSet }[] = [
   },
   {
     body: "Your invoice for June is missing the PO number — can you resend?",
+    urgency: "medium",
     angles: {
       warm: "Ah, my mistake — thanks for catching it. Resending with the PO number this afternoon.",
       direct: "Fixed — corrected invoice with the PO goes out today.",
@@ -643,11 +667,25 @@ const SENT_ITEMS: { body: string; nudges: AngleSet }[] = [
 export const ANGLES_BY_BODY = new Map(NEEDS_ITEMS.map((i) => [i.body, i.angles]));
 export const NUDGES_BY_BODY = new Map(SENT_ITEMS.map((i) => [i.body, i.nudges]));
 
-// Incoming threads that arrive with a ready draft (chips in Needs Reply).
-const DRAFTED_SNIPPETS = [
-  "Following up on my last note — any thoughts on the proposal?",
-  "Sent over the contract redlines. Two small changes — OK to proceed?",
-  "I owe you an intro to that designer I mentioned. Still interested?",
+// Incoming threads that arrive with a ready draft (chips in Important's
+// needs-reply section). One per urgency tier so the draft-boost-within-tier
+// rule is visible. Urgencies hand-assigned (F4): plausible, not mechanical.
+const DRAFTED_ITEMS: { body: string; urgency: Urgency; suggestion: string }[] = [
+  {
+    body: "Sent over the contract redlines. Two small changes — OK to proceed?",
+    urgency: "high",
+    suggestion: "Draft ready — they're waiting on your go-ahead to proceed.",
+  },
+  {
+    body: "Following up on my last note — any thoughts on the proposal?",
+    urgency: "medium",
+    suggestion: "Draft ready for your review — second nudge on their proposal.",
+  },
+  {
+    body: "I owe you an intro to that designer I mentioned. Still interested?",
+    urgency: "normal",
+    suggestion: "Draft ready for your review.",
+  },
 ];
 
 // Social needs-reply (v6): no direct ask — a courtesy reply at most. The
@@ -709,6 +747,9 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
   let body: string;
   let suggestion: string;
   let direction: "in" | "out" = "in";
+  // Urgency rides with the CONTENT, not the index (F4): a congrats note must
+  // never outrank a contract question just because of where it fell.
+  let urgency: Urgency = "normal";
   if (status === "sent") {
     body = SENT_ITEMS[(nth - 1) % SENT_ITEMS.length].body;
     suggestion = "You asked; nothing to do until they answer.";
@@ -720,14 +761,19 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     body = FYI_ITEMS[(nth - 1) % FYI_ITEMS.length];
     suggestion = "Minor info, no ask — kept out of Important.";
   } else if (spec.withDraft) {
-    body = DRAFTED_SNIPPETS[(nth - 1) % DRAFTED_SNIPPETS.length];
-    suggestion = "Draft ready for your review.";
+    const item = DRAFTED_ITEMS[(nth - 1) % DRAFTED_ITEMS.length];
+    body = item.body;
+    suggestion = item.suggestion;
+    urgency = item.urgency;
   } else if (spec.social) {
     body = SOCIAL_ITEMS[(nth - 1) % SOCIAL_ITEMS.length];
     suggestion = "Friendly note, no direct ask — kept out of Important; reply optional.";
   } else {
-    body = NEEDS_ITEMS[(nth - 1) % NEEDS_ITEMS.length].body;
-    suggestion = "Open question in the last message; a short reply keeps it moving.";
+    const item = NEEDS_ITEMS[(nth - 1) % NEEDS_ITEMS.length];
+    body = item.body;
+    suggestion =
+      item.suggestion ?? "Open question in the last message; a short reply keeps it moving.";
+    urgency = item.urgency;
   }
 
   // Sent threads spread over ~9 days so staleness (>= 3d) actually shows;
@@ -741,14 +787,7 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     source,
     status,
     important: spec.important,
-    // Urgency only where Hermes flagged importance — a high-priority dot on a
-    // kept-out-of-Important row would contradict the triage voice.
-    urgency:
-      status === "needs_reply" && spec.important && i % 9 === 0
-        ? "high"
-        : status === "needs_reply" && spec.important && i % 4 === 0
-          ? "medium"
-          : "normal",
+    urgency,
     unread: (status === "needs_reply" && i % 3 === 0) || (status === "fyi" && i % 7 === 0),
     lastActivity: iso(minAgo),
     hermesSuggestion: suggestion,

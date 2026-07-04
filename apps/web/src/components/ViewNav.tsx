@@ -32,8 +32,10 @@ export function ViewNav() {
         : c.status === "sent" && !isSnoozed(c, now);
   const count = (v: ViewId) =>
     conversations.filter((c) => inSource(c) && inView(c, v)).length;
+  // Same lens as count() — an unread dot claiming rows the filtered view
+  // won't show would lie (pressure-test F3).
   const unread = (v: ViewId) =>
-    conversations.filter((c) => c.unread && inView(c, v)).length;
+    conversations.filter((c) => c.unread && inSource(c) && inView(c, v)).length;
   const snoozedCount = conversations.filter((c) => isSnoozed(c, now)).length;
 
   return (

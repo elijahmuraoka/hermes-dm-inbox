@@ -114,6 +114,17 @@ interface InboxState {
   demoState: (mode: "empty" | "error") => void;
 }
 
+// The FYI fold survives reloads (pressure-test F5) — a deliberate display
+// preference, unlike filters/sort which reset to honest defaults.
+const FYI_FOLD_KEY = "hdi.fyi-collapsed";
+function readFyiCollapsed(): boolean {
+  try {
+    return localStorage.getItem(FYI_FOLD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function pushAudit(
   list: AuditEvent[],
   ev: Omit<AuditEvent, "id" | "timestamp">,
@@ -148,7 +159,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   filters: NO_FILTERS,
   sortModes: { ...DEFAULT_SORTS },
   showDoneInSent: false,
-  fyiCollapsed: false,
+  fyiCollapsed: readFyiCollapsed(),
   selectedId: null,
   mobilePane: "list",
   draftSheetOpen: false,
@@ -212,7 +223,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   // Folding FYI can orphan a selected FYI row — same re-anchor rule as above.
   toggleFyiCollapsed: () => {
-    set((s) => ({ fyiCollapsed: !s.fyiCollapsed }));
+    const next = !get().fyiCollapsed;
+    try {
+      localStorage.setItem(FYI_FOLD_KEY, next ? "1" : "0");
+    } catch {
+      // storage unavailable → the fold is session-only; still fully usable
+    }
+    set({ fyiCollapsed: next });
     const { visibleConversations, selectedId } = get();
     const list = visibleConversations();
     if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });

@@ -9,14 +9,14 @@ as polish so they aren't lost:
 
 - **F2 — rail counts don't blank at `?state=error`.** The list header shows an honest "—" when a
   sync error means counts can't be vouched for, but the rail still renders numbers. Same rule
-  should apply to ViewNav.
-- **F3 — unread dot ignores the source filter.** `count()` respects the active source filter;
-  `unread()` doesn't, so the rail's unread dot can claim unread that the filtered view won't show.
-- **F4 — fixture triage-voice credibility.** Generator urgency is mechanical (`i % 9` / `i % 4`),
-  which creates implausible pairs (a high-priority dot on a casual note next to a normal-priority
-  contract question). Make urgency assignments content-plausible so Hermes's triage voice reads
-  credible in demos.
-- **F5 — FYI collapse not persisted.** The fold resets on reload; persist it (localStorage).
+  should apply to ViewNav. (Parked: the state is dev-gated.)
+- ~~**F3 — unread dot ignores the source filter.**~~ **Fixed 2026-07-04:** `unread()` now applies
+  the same source lens as `count()`.
+- ~~**F4 — fixture triage-voice credibility.**~~ **Fixed 2026-07-04:** generator urgency is
+  hand-assigned per body (deadlines/blockers high·medium, congrats/curiosity normal), with
+  triage-voice suggestion overrides on the high items; the mechanical `i % 9` assignment is gone.
+- ~~**F5 — FYI collapse not persisted.**~~ **Fixed 2026-07-04:** the fold persists via
+  localStorage (`hdi.fyi-collapsed`); storage-unavailable degrades to session-only.
 - **F6 — (documented in DESIGN.md §5.2) both-sections-empty renders ONE view-level empty state**
   rather than two per-section empties — accepted as better than the literal per-section spec.
 - **F7 — mobile post-send stays on the thread** rather than returning to the list. Reasonable
