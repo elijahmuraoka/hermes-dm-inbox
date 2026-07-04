@@ -4,9 +4,9 @@
 
 The best architecture for Hermes DM Inbox is:
 
-> **Local SQLite spine + Python application primitives + local REST UI + `hdi` CLI + `/hermes-dm-inbox` Hermes resolver skill, with privacy enforced by body-vault/reveal policy and no send path until a separate spec.**
+> **Local SQLite spine + TypeScript application primitives + Hono REST API + React UI + `hdi` CLI + `/hermes-dm-inbox` Hermes resolver skill, with privacy enforced by body-vault/reveal policy and no send path until a separate spec.**
 
-This remains the right system after pressure-testing against:
+This is the right system after pressure-testing against:
 
 - local-first app architecture
 - Cloudflare Agentic Inbox-style per-mailbox SQLite + AI side-panel/tools + explicit send confirmation
@@ -15,26 +15,55 @@ This remains the right system after pressure-testing against:
 - private-message security constraints
 - open-source packaging constraints
 
-The key upgrade from the earlier sketch: **the canonical abstraction is not SQLite, REST, CLI, or the UI. The canonical abstraction is application primitives.** Every surface wraps the same primitives.
+The key principle: **the canonical abstraction is application primitives.** Every surface wraps the same primitives.
 
-## North-star product
+## Why TypeScript won
 
-Hermes DM Inbox is a local communication command center:
+Originally considered Python/FastAPI, but TypeScript is the better backend for this project:
 
-- syncs personal/professional messaging sources into local state
-- makes triage fast with a keyboard-first UI
-- lets the configured Hermes agent search, summarize, classify, and draft
-- keeps private bodies behind explicit reveal/share boundaries
-- records durable approvals/intents before any future side effects
+1. **Single language monorepo.** Bun workspace for everything — one package manager, one test runner, one build system, one type system.
+2. **Shared types between frontend and backend.** Privacy-sensitive DTOs (redacted vs revealed vs shared-with-Hermes) are defined once in `packages/shared/` and imported everywhere. No hand-maintained Python ↔ TypeScript contract.
+3. **`bun:sqlite` is built-in and excellent.** Zero-dependency, synchronous, WAL mode, no async overhead for local operations.
+4. **Connector tools are all CLI wrappers anyway.** `imsg`, `xurl`, `linkedin-os`, `gog`, `hermes` are all subprocess calls. No Python dependency in the connector layer.
+5. **Hono + Zod = FastAPI + Pydantic.** Type-safe HTTP, Zod validation, middleware, native Bun support.
+6. **Drizzle ORM** for type-safe SQLite queries and migrations.
 
-## Final architecture
+## Monorepo structure
+
+```text
+hermes-dm-inbox/
+├── package.json              Bun workspace root
+├── bun.lock
+├── tsconfig.json             base TypeScript config
+├── packages/
+│   ├── shared/               DTOs, types, body policies, connector contracts
+│   ├── db/                   schema, migrations (drizzle-kit), repositories
+│   ├── primitives/           application services / domain logic
+│   ├── connectors/           connector adapters (mock, future imsg/linkedin/xurl)
+│   └── hermes/               mock adapter, local adapter interface
+├── apps/
+│   ├── server/               Hono HTTP server
+│   ├── web/                  React 19 + Vite UI
+│   └── cli/                  hdi CLI (imports primitives directly, not REST)
+└── docs/                     VISION, ARCHITECTURE, specs, plans
+```
+
+Single command for everything:
+
+```bash
+bun install && bun run dev    # starts server + Vite + watch
+bun test                      # all tests
+bun run build                 # production build
+```
+
+## Architecture
 
 ```text
 External messaging systems
   ├─ iMessage via imsg
   ├─ LinkedIn via linkedin-os
   ├─ X/Twitter via xurl
-  ├─ Gmail via gog later / separate email model
+  ├─ Gmail via gog — deferred
   └─ future connectors
         ↓
 Connector adapters
@@ -47,28 +76,25 @@ Sync engine
   - connector health/cursors
   - redacted audit events
         ↓
-SQLite local store
-  ├─ index DB: metadata, redacted previews, labels, drafts, tasks, audit
-  └─ body vault: raw bodies / attachments behind reveal policy
+SQLite local store (~/.hermes-dm-inbox/)
+  ├─ inbox.db: metadata, redacted previews, drafts, audit, sync state
+  └─ vault.db: raw message bodies behind reveal policy
         ↓
-Application primitives
+Application primitives (packages/primitives/)
   ├─ sync
-  ├─ list/search conversations
-  ├─ get thread
-  ├─ reveal body
+  ├─ list_conversations
+  ├─ get_thread
+  ├─ reveal_message_body
+  ├─ search
+  ├─ draft_reply
   ├─ triage
-  ├─ draft reply
-  ├─ summarize
-  ├─ label/status
-  ├─ create follow-up task
-  ├─ approve draft intent
-  └─ future enqueue send
+  └─ approve_draft
         ↓
 Surfaces
-  ├─ React local UI over FastAPI REST
-  ├─ hdi CLI for scripts/operators/Hermes
-  ├─ /hermes-dm-inbox skill as resolver/safety wrapper
-  └─ future MCP adapter over the same primitives
+  ├─ apps/web/    React UI over Hono REST
+  ├─ apps/cli/    hdi CLI (imports primitives directly)
+  ├─ skill        /hermes-dm-inbox skill (resolver/safety wrapper)
+  └─ future       MCP adapter over the same primitives
 ```
 
 ## Dependency direction
@@ -76,135 +102,99 @@ Surfaces
 ```text
 UI / CLI / Skill / future MCP
         ↓
-Transport adapters: REST routes, CLI handlers, skill recipes
+Transport: REST routes, CLI command handlers, skill recipes
         ↓
-Application services / primitives
+Application primitives (packages/primitives/)
         ↓
-Domain contracts: messages, connectors, body policy, drafts, triage
+Domain contracts (packages/shared/)
         ↓
-Infrastructure: SQLite repos, connector subprocesses, Hermes adapter, audit
+Infrastructure: Drizzle repos, connector subprocesses, Hermes adapter, audit
 ```
 
-Rules:
+Key rule: **CLI imports primitives directly, not via REST.** The CLI is a peer surface alongside the server. REST is for the browser UI only. This avoids an unnecessary HTTP hop for local CLI use and keeps the CLI fast.
 
-- UI does not talk directly to SQLite.
-- CLI does not reimplement business logic.
-- Hermes skill does not know schema internals.
-- Connectors do not write directly to UI state.
-- REST endpoints are wrappers, not the product core.
-- Future MCP is a wrapper, not the starting architecture.
+## Technology stack
 
-## Why this architecture wins
-
-### SQLite spine
-
-SQLite is right because this is private, single-user, local, query-heavy state. It supports fast search, sync cursors, audit trails, drafts, labels, and task extraction without cloud infrastructure.
-
-### Python primitives
-
-Python/FastAPI is right for connector orchestration because the integrations are CLI/subprocess/local-machine heavy (`imsg`, `linkedin-os`, `xurl`, `gog`, `hermes`). Pydantic/FastAPI also gives strong API contracts and testability.
-
-### Local REST UI
-
-React/Vite over localhost REST keeps the browser away from raw DB/vault access while retaining a fast UI and future mobile/Tailscale option.
-
-### CLI from Phase 0
-
-`hdi` should exist early because it is the agent contract, automation contract, and debugging surface. If a primitive cannot be expressed as a deterministic CLI command with `--json`, it is probably underspecified.
-
-### Hermes skill as resolver
-
-The skill maps user intent to safe CLI/API operations. It should be an expert operator manual for Hermes, not a second backend.
-
-### MCP later
-
-MCP is attractive, but not first. Build primitives first; then expose stable primitives through MCP if useful.
-
-## Rejected alternatives
-
-### UI directly reads SQLite
-
-Rejected for v0. It leaks schema to the frontend, weakens privacy boundaries, complicates body reveal audit, and does not fit connector subprocesses.
-
-### Hermes gateway plugin first
-
-Rejected for v0. It over-couples the app to Hermes internals and makes the open-source product less standalone. Hermes integrates through skill/CLI first.
-
-### MCP server first
-
-Deferred. MCP should expose stable primitives after REST/CLI/privacy behavior is proven.
-
-### Browser SQLite / IndexedDB as canonical state
-
-Rejected for v0. The OS-local connectors and Hermes/CLI access need a host-side data plane. Browser storage may become a cache later, not the source of truth.
-
-### Full event sourcing
-
-Rejected for v0. Use relational current-state tables plus append-only audit/sync/outbox-style tables where needed. Full event sourcing is overkill before the domain stabilizes.
-
-### TypeScript-only backend
-
-Rejected. Python remains better for local CLI wrappers, subprocesses, SQLite, Hermes invocation, and connector tests.
+| Layer | Choice |
+|---|---|
+| Runtime | Bun |
+| Package manager | Bun workspaces |
+| Language | TypeScript strict |
+| HTTP framework | Hono + Zod |
+| Database | `bun:sqlite` (WAL mode) |
+| ORM / migrations | Drizzle ORM + drizzle-kit |
+| Frontend | React 19 + Vite |
+| Frontend tests | Vitest + Testing Library |
+| Backend/CLI tests | Vitest or `bun test` |
+| Hermes adapter | Mock default, local Hermes subprocess opt-in |
+| Config location | `~/.hermes-dm-inbox/` (overridable via `HDI_HOME`) |
+| License | Apache 2.0 |
 
 ## Canonical primitives
 
 Phase 0 primitives:
 
-| Primitive | Purpose | Surface exposure |
+| Primitive | Purpose | Surface |
 |---|---|---|
 | `sync(source?)` | ingest mock/source records | REST + CLI |
 | `list_conversations(filter)` | redacted conversation list | REST + CLI + skill |
 | `get_thread(conversation_id)` | redacted thread view | REST + CLI + skill |
-| `reveal_message_body(message_id, reason)` | audited body reveal | REST + CLI with human policy |
+| `reveal_message_body(message_id, reason)` | audited body reveal | REST + CLI (human policy) |
 | `search(query, filters)` | local redacted search | REST + CLI + skill |
 | `draft_reply(conversation_id, instructions, body_policy)` | create draft via mock/Hermes adapter | REST + CLI + skill |
 | `triage(scope, policy)` | classify/prioritize messages | REST + CLI + skill |
-| `label(target, labels)` | local organization | REST + CLI |
-| `create_task_from_message(message_id, task)` | follow-up capture | REST + CLI + skill |
 | `approve_draft(draft_id)` | records approval intent only | REST + CLI |
 
-Later primitives:
+Deferred primitives:
 
 | Primitive | Gate |
 |---|---|
-| `summarize_thread` | after reveal/prompt policy is proven |
-| `enqueue_send` | separate send-path spec |
-| `background_triage` | background sync/orchestration spec |
-| `mcp_*` wrappers | after primitives stabilize |
+| `label(target, labels)` | Phase 1 — freeform labels |
+| `summarize_thread` | Phase 2 — after reveal/prompt policy proven |
+| `create_task_from_message` | Phase 2 — needs task model design |
+| `enqueue_send` | Phase 4 — separate send-path spec |
+| `background_triage` | Phase 3 — background sync/orchestration spec |
+| `mcp_*` wrappers | After primitives stabilize |
 
-## Data model direction
+## Data model
 
-Use SQLite with a clear split between index data and body/vault data.
+### Phase 0 tables
 
-Minimum index tables:
+Index store (`inbox.db`):
 
-- `sources`
-- `source_accounts`
-- `conversations`
-- `participants`
-- `conversation_participants`
-- `messages`
-- `drafts`
-- `draft_versions`
-- `approvals`
-- `labels`
-- `conversation_labels`
-- `tasks`
-- `sync_runs`
-- `connector_state`
-- `audit_logs`
+| Table | Purpose |
+|---|---|
+| `sources` | registered connector/source metadata |
+| `source_accounts` | local accounts/personas per source |
+| `conversations` | source/source_id, latest time, unread, triage state |
+| `participants` | source participant id, display alias |
+| `conversation_participants` | join table |
+| `messages` | metadata + redacted preview only |
+| `drafts` | generated/edited drafts |
+| `approvals` | approval/rejection/send-intent records |
+| `sync_runs` | connector sync history |
+| `connector_state` | cursors, health, last successful sync |
+| `audit_logs` | append-only redacted audit events |
 
-Body/vault tables or store:
+Body vault (`vault.db`):
 
-- `message_bodies`
-- `attachment_blobs`
-- optional encryption metadata/key versions
+| Table | Purpose |
+|---|---|
+| `message_bodies` | raw message body (Phase 0: separate DB, policy boundary; Phase 1+: encrypted) |
 
-Default stance for Phase 0: implement schema boundaries and tests first; encryption can be staged if local keychain integration is too large for initial scaffold, but the API/DTO contract must already treat bodies as vault-controlled.
+### Deferred to later phases
 
-## REST API contract shape
+| Table | When |
+|---|---|
+| `draft_versions` | Phase 1 — version history |
+| `labels` + `conversation_labels` | Phase 1 — freeform labels |
+| `tasks` | Phase 2 — follow-up task model |
+| `attachment_blobs` | Phase 2 — attachment handling |
+| `encryption_metadata` | Phase 1+ — vault key management |
 
-Phase 0 routes:
+## REST API
+
+Phase 0 routes (Hono):
 
 ```text
 GET  /healthz
@@ -220,9 +210,11 @@ POST /api/drafts/{draft_id}/approve
 GET  /api/audit
 ```
 
-Important: body reveal should be `POST`, not `GET`, because reveal is an audited stateful privacy action.
+Server binds `127.0.0.1` by default. Reveal is `POST` because it is a stateful audited privacy action.
 
-## CLI contract shape
+## CLI contract
+
+`hdi` imports primitives from `packages/primitives/` directly.
 
 ```bash
 hdi health --json
@@ -233,171 +225,107 @@ hdi thread <conversation-id> --json
 hdi reveal <message-id> --reason "reply drafting" --json
 hdi draft <conversation-id> --instructions "warm but concise" --json
 hdi triage --scope unread --json
-hdi label add <conversation-id> investor --json
-hdi task create --message <message-id> --text "follow up Friday" --json
+hdi approve <draft-id> --json
 hdi audit tail --json
 ```
 
-CLI defaults:
+CLI defaults: redacted, `--json` always available, stable exit codes, no raw SQL.
 
-- redacted by default
-- `--json` always available
-- explicit reveal/body policy required for raw bodies
-- stable exit codes
-- no direct raw SQL command in v0
-
-## Hermes integration plan
+## Hermes integration
 
 ### Level 1 — Hermes as caller
-
-Hermes uses `/hermes-dm-inbox` skill and `hdi` CLI. This is the safest first integration.
+Hermes uses `/hermes-dm-inbox` skill + `hdi` CLI. Safest first integration.
 
 ### Level 2 — Hermes as app service adapter
-
-The UI can ask Hermes for drafts/summaries through the backend Hermes adapter. Mock by default; local Hermes opt-in.
+UI calls local Hermes adapter for drafts/summaries. Mock by default; local Hermes subprocess opt-in.
 
 ### Level 3 — Hermes as orchestrator
+Future background workflows. Separate design required.
 
-Future background workflows: daily triage, stale follow-ups, suggested replies, task extraction. Requires a separate background/orchestration design.
+## `/hermes-dm-inbox` skill
 
-## `/hermes-dm-inbox` skill responsibilities
+Should: map user intent to safe CLI commands, enforce redacted-by-default, instruct Hermes to ask before body reveal, forbid send behavior.
 
-The skill should:
-
-- describe when to use the inbox
-- map user intents to CLI commands/primitives
-- enforce redacted-by-default behavior
-- instruct Hermes to ask before full-body reveal/share
-- forbid send behavior until send path exists
-- use `--json` outputs for reliable parsing
-- avoid private/person-specific assumptions
-
-The skill should not:
-
-- duplicate backend logic
-- contain DB schema details beyond stable public handles
-- query raw SQLite directly
-- expose vault paths/keys/tokens
-- auto-load globally for unrelated tasks
+Should not: duplicate backend logic, know schema internals, query SQLite directly, expose vault paths/keys/tokens, auto-load globally.
 
 ## Product direction
 
-The UI should be a **triage cockpit**, not just a chronological feed.
+Triage cockpit, not chronological feed. Three views — **Needs Reply / Sent / All** (DECISION v5,
+2026-07-03; see the ux-contract) — with view-specific sort orders and filters on every view. Bodies are
+always visible to the human (v1); Hermes reads a thread only via a draft request, with no in-product
+share signaling (v2/v4) — the boundary lives in the request pipeline, not the UI.
 
-Core buckets:
-
-- Needs Reply
-- Drafted
-- Waiting
-- FYI
-- Noise
-- Done
-- Snoozed / Later
-
-Core surfaces:
-
-- source/sidebar filter
-- triage inbox list
-- thread view
-- Hermes draft panel
-- command palette
-- draft review queue
-- audit/reveal indicator
+```text
+┌────────────────────────────────────────────────────────────────┐
+│ top bar: search, sync status, Cmd+K                            │
+├───────────────┬────────────────────────────────────────────────┤
+│ views/sources │ conversation list │ thread + composer          │
+│ + filters     │ (view-aware rows) │ + Hermes drafting studio   │
+└───────────────┴────────────────────────────────────────────────┘
+```
 
 ## Phase plan
 
-### Design Gate 0 — current gate
+### Design Gate — complete
 
-Before implementation:
-
-- final system architecture approved
-- security/privacy invariants approved
-- product/UX contract approved
-- spec patched to match final architecture
-- Phase 0 implementation plan written
+- System architecture: ✓ (this doc)
+- Security/privacy invariants: ✓
+- Product/UX contract: ✓
+- Spec synced: ✓ (SPEC.md updated to the TypeScript stack, 2026-07-03)
+- Tech stack decision: ✓ (`decisions/0001-tech-stack.md` accepted as amended, 2026-07-03)
+- Phase 0 implementation plan: next
 
 ### Phase 0 — mock vertical slice
 
-Build the whole architecture with fake data only:
+Build the full architecture with mock data only:
 
-- Bun workspace
-- FastAPI app
-- SQLite schema/migrations
-- mock connector
-- sync engine
-- REST API
+- Bun monorepo workspace
+- Drizzle schema + migrations
+- `bun:sqlite` with WAL
+- MockConnector with deterministic data
+- Sync engine
+- Application primitives
+- Hono REST API
 - `hdi` CLI skeleton
 - React keyboard shell
-- mock Hermes adapter
-- draft/triage primitives
-- redaction/reveal/audit tests
-- public README
+- MockHermesAdapter
+- Body reveal as audited `POST`
+- Privacy leak tests (scan index DB, audit logs, API responses for canary text)
+- No real connector data, no local Hermes invocation, no send path
 
-### Phase 1 — one real connector
+### Phase 1 — first real connector
 
-Pick exactly one:
-
-- iMessage first if local/macOS proof matters most
-- LinkedIn first if product value/public demo matters most
-
-No sends. Manual sync only.
+Exactly one real connector. Manual sync. No sends.
 
 ### Phase 1.5 — second real connector
 
-Add the second connector to prove abstraction and schema.
+Prove connector abstraction across two real sources.
 
 ### Phase 2 — Hermes-native workflows
 
-- opt-in LocalHermesAdapter
-- richer drafts/summaries/triage
-- task/follow-up extraction
-- `/hermes-dm-inbox` skill hardening
+LocalHermesAdapter opt-in, richer drafts/triage, `/hermes-dm-inbox` skill hardening, labels, follow-up tasks.
 
 ### Phase 3 — scale/polish
 
-- better search
-- virtualized lists
-- local auth/PIN
-- responsive/Tailscale view
-- background sync proposal
+Search quality, virtualized lists, local auth, Tailscale view, background sync proposal.
 
 ### Phase 4 — send path
 
-Separate spec only:
+Separate spec only: send queue, dry-run, per-message confirmation, audit trail.
 
-- send queue/outbox
-- dry-run mode
-- exact-recipient/body confirmation
-- per-message single-use approval
-- connector write capability negotiation
-- full audit trail
+## Mandatory decisions
 
-## Mandatory decisions now
-
-Default decisions to lock unless overridden:
-
-1. Product is **DM-first**, not universal email/comms in v0.
-2. Gmail is deferred until after two DM-like connectors prove the model.
+1. Product is **DM-first**.
+2. Gmail is deferred.
 3. SQLite is canonical local state.
-4. Python primitives own business logic.
-5. REST, CLI, skill, future MCP are wrappers.
-6. `hdi` CLI skeleton ships in Phase 0.
-7. `/hermes-dm-inbox` skill ships as resolver/wrapper, not global auto-load for all tasks.
-8. Mock connector and MockHermesAdapter are defaults.
-9. No real connector data in Phase 0.
-10. No local Hermes invocation in Phase 0 unless explicitly enabled for a separate smoke.
-11. No send path until separate spec.
-12. Public repo examples/fixtures/screenshots stay synthetic.
-
-## Implementation readiness checklist
-
-Do not begin Phase 0 implementation until these docs exist and agree:
-
-- `SPEC.md`
-- `context/final-system-architecture-and-plan.md`
-- `context/security-privacy-invariants.md`
-- `context/product-ux-contract.md`
-- `decisions/0001-tech-stack.md`
-- Phase 0 implementation plan
-
-Then implementation can begin in a new `wt` worktree with TDD and review gates.
+4. TypeScript owns everything — Bun workspace, Hono, Drizzle, `bun:sqlite`.
+5. Primitives are the canonical API. REST/CLI/skill/future MCP are wrappers.
+6. CLI imports primitives directly, not via REST.
+7. `hdi` CLI skeleton ships in Phase 0.
+8. `/hermes-dm-inbox` skill ships as resolver/wrapper.
+9. Mock connector and MockHermesAdapter are defaults.
+10. No real connector data in Phase 0.
+11. No local Hermes invocation in Phase 0.
+12. No send path until separate spec.
+13. Public repo: synthetic fixtures only.
+14. Config at `~/.hermes-dm-inbox/`, overridable via `HDI_HOME`.

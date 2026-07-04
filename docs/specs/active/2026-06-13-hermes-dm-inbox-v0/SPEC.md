@@ -58,13 +58,15 @@ Hermes DM Inbox is a local web app opened in the browser. It feels like Superhum
 | Layer | Choice |
 |---|---|
 | Repo/package runtime | Bun workspace root (`bun@1.3.11`) |
-| Frontend | React 19 + Vite + TypeScript strict |
+| Language | TypeScript strict throughout |
+| Frontend | React 19 + Vite |
 | Frontend tests | Vitest + Testing Library |
-| Backend | Python 3.11+ + FastAPI + SQLite |
-| Backend env/deps | uv |
-| Backend tests | pytest + FastAPI TestClient |
+| Backend HTTP | Hono + Zod validation |
+| Database | `bun:sqlite` (WAL mode) |
+| ORM / migrations | Drizzle ORM + drizzle-kit |
+| Backend/CLI tests | Vitest or `bun test` |
+| Agent adapter | Mock by default, local Hermes subprocess opt-in |
 | Docs | Tomoji doc-maintenance layout |
-| Agent adapter | Mock by default, local Hermes opt-in |
 
 Rationale lives in `decisions/0001-tech-stack.md`.
 
@@ -101,55 +103,53 @@ Minimum SQLite tables:
 |---|---|
 | sources | registered connector/source metadata |
 | source_accounts | local accounts/personas per source |
-| conversations | source/source_id, latest time, unread, muted, local status |
-| participants | source participant id, display name/alias, redacted handle |
+| conversations | source/source_id, latest time, unread, triage state |
+| participants | source participant id, display name/alias |
 | conversation_participants | conversation-to-participant join table |
 | messages | message metadata + redacted preview only |
-| message_bodies | raw message body vault, separated from list/search/audit surfaces |
+| message_bodies | raw message body vault, separate DB file, gated by reveal policy |
 | drafts | Hermes-produced drafts and edited draft text |
-| draft_versions | draft revision history |
 | approvals | approval/rejection/send-intent records |
-| labels | local labels/categories |
-| conversation_labels | labeling join table |
-| tasks | follow-up/reminder work items derived from messages |
-| audit_logs | redacted operational event log |
+| audit_logs | append-only redacted operational event log |
 | sync_runs | connector sync history |
 | connector_state | connector cursors, health, and last successful sync |
+
+Deferred to later phases: draft_versions (Phase 1), labels/conversation_labels (Phase 1), tasks (Phase 2), attachment_blobs (Phase 2).
 
 ## Connector contract
 
 Each connector implements a read-only contract:
 
-```python
-class ConnectorBase(ABC):
-    source: str
-    name: str
+```typescript
+interface Connector {
+  source: string;
+  name: string;
 
-    async def fetch_conversations(
-        self,
-        cursor: str | None = None,
-        limit: int = 50,
-    ) -> Page[ConversationData]: ...
+  fetchConversations(
+    cursor?: string,
+    limit?: number,
+  ): Promise<PagedResult<ConversationData>>;
 
-    async def fetch_messages(
-        self,
-        conversation_id: str,
-        cursor: str | None = None,
-        since: str | None = None,
-        limit: int = 100,
-    ) -> Page[MessageData]: ...
+  fetchMessages(
+    conversationId: string,
+    cursor?: string,
+    since?: string,
+    limit?: number,
+  ): Promise<PagedResult<MessageData>>;
 
-    def capabilities(self) -> ConnectorCapabilities: ...
+  capabilities(): ConnectorCapabilities;
+}
 ```
 
 Phase 0/1 capabilities are read-only. No connector has `send`, `delete`, `archive`, `mark_read`, or `oauth` responsibilities.
 
 ## Hermes adapter contract
 
-```python
-class HermesAdapter(ABC):
-    async def ask(self, prompt: str, context: dict) -> HermesResponse: ...
-    async def draft_reply(self, conversation: dict, messages: list[dict]) -> HermesResponse: ...
+```typescript
+interface HermesAdapter {
+  ask(prompt: string, context: Record<string, unknown>): Promise<HermesResponse>;
+  draftReply(conversation: ConversationMetadata, messages: MessageMetadata[]): Promise<HermesResponse>;
+}
 ```
 
 Rules:
@@ -178,10 +178,11 @@ Rules:
 
 Acceptance:
 
-- Bun workspace root
-- FastAPI app skeleton
+- Bun monorepo workspace (packages + apps)
+- Drizzle schema + migrations
+- `bun:sqlite` with WAL mode
+- Hono REST API
 - React/Vite app skeleton
-- SQLite store with body-vault schema
 - MockConnector with deterministic data
 - MockHermesAdapter
 - `hdi` CLI skeleton over the same primitives
@@ -190,7 +191,7 @@ Acceptance:
 - No real connector data
 - No local Hermes invocation
 - No send path
-- `bun test`, `bun run build`, and server pytest pass
+- `bun test`, `bun run build` pass
 
 ### Phase 1 — First real read-only data
 
@@ -250,8 +251,7 @@ Acceptance:
 
 - Work in `wt` worktrees only.
 - Main checkout stays clean on `main`.
-- Use Bun for all JS package management and scripts.
-- Use uv for Python backend dependencies.
+- Use Bun for all package management, scripts, and tests (TypeScript end-to-end — no Python surface).
 - Test-first for store, connector, and API behavior.
 - Browser visual QA for UI work.
 - No raw message body in logs, list endpoints, or audit payloads.
