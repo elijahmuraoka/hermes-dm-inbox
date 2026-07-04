@@ -5,7 +5,8 @@ import { PEOPLE } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { cn, relTime } from "@/lib/utils";
 import { SourceIcon } from "@/components/SourceIcon";
-import { ChevronLeft, Paperclip, SendHorizontal } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
+import { Check, ChevronLeft, Moon, Paperclip, SendHorizontal } from "lucide-react";
 import { HermesMark } from "@/components/HermesMark";
 
 export function Thread({ conversation: c }: { conversation: Conversation }) {
@@ -13,6 +14,8 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
   const now = useInboxStore((s) => s.now);
   const backToList = useInboxStore((s) => s.backToList);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
+  const markDone = useInboxStore((s) => s.markDone);
+  const snooze = useInboxStore((s) => s.snooze);
   const hasDraft = c.draft.versions.length > 0 || c.draft.status === "angles_ready";
 
   return (
@@ -55,14 +58,42 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
         <span className="ml-auto hidden truncate font-mono text-[0.6875rem] text-muted-foreground sm:inline">
           {person.handle}
         </span>
+        {/* v7 mouse parity: the thread carries its own quiet triage buttons —
+            e/s work here too, and every hotkey needs a visible path. */}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5 sm:ml-2">
+          <button
+            type="button"
+            onClick={() => markDone()}
+            aria-label={c.status === "fyi" ? "Acknowledge · e" : "Mark done · e"}
+            title={c.status === "fyi" ? "Acknowledge · e" : "Mark done · e"}
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Check className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => snooze()}
+            aria-label="Snooze · s"
+            title="Snooze · s"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Moon className="size-3.5" />
+          </button>
+        </span>
         {/* Below xl the side panel doesn't exist — the hero loop needs a visible door. */}
         <button
           type="button"
           onClick={() => setDraftSheet(true)}
-          className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[0.75rem] font-medium text-foreground transition-colors hover:bg-primary/20 sm:ml-2 xl:hidden"
+          className="ml-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[0.75rem] font-medium text-foreground transition-colors hover:bg-primary/20 xl:hidden"
         >
           <HermesMark className="size-3.5 text-primary" strokeWidth={2.2} />
-          {hasDraft ? "View draft" : "Draft"}
+          {hasDraft ? (
+            "View draft"
+          ) : (
+            <>
+              Draft <Kbd className="ml-0.5">d</Kbd>
+            </>
+          )}
         </button>
       </div>
 
@@ -92,7 +123,7 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
       </div>
 
       <RoutingStrip conversation={c} />
-      <Composer />
+      <Composer conversation={c} />
     </div>
   );
 }
@@ -134,18 +165,24 @@ function RoutingStrip({ conversation: c }: { conversation: Conversation }) {
 }
 
 /** The one editing surface — a standard messenger composer. Hermes drafts land
-    here as prefills ("Add to chat"); ⌘Enter sends.
+    here as prefills ("Add to chat"); ⌘Enter sends. v7 fast-path: clicking here
+    (or c) is just replying — zero Hermes steps; the ghost "Draft with Hermes"
+    button at the right edge is where drafting becomes discoverable from the
+    place people already are (assistive, not modal). It yields the moment you
+    type or a draft exists — never in the way of the fast path.
     IMPLEMENTATION HONESTY (code-level only — the UI is diegetic, per Elijah
     2026-07-03): v0 "send" is a local mock append; nothing is delivered.
     That truth lives HERE, in commits, and in the PR — never on the surface. */
-function Composer() {
+function Composer({ conversation: c }: { conversation: Conversation }) {
   const composerText = useInboxStore((s) => s.composerText);
   const setComposerText = useInboxStore((s) => s.setComposerText);
   const composerAttach = useInboxStore((s) => s.composerAttach);
   const toggleAttach = useInboxStore((s) => s.toggleAttach);
   const sendMock = useInboxStore((s) => s.sendMock);
+  const requestDraft = useInboxStore((s) => s.requestDraft);
   const focusTick = useInboxStore((s) => s.composerFocusTick);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const followup = c.status === "sent";
 
   // focusComposer()/addToChat() bump the tick → we take focus on the NEXT
   // frame, after the triggering keydown's default processing has finished —
@@ -213,10 +250,28 @@ function Composer() {
                 e.currentTarget.blur();
               }
             }}
-            placeholder="Reply… (c to focus · ⌘Enter to send)"
+            placeholder="Reply… (c · ⌘⏎ to send)"
             aria-label="Message composer"
             className="max-h-[132px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-[0.8125rem] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
           />
+          {/* Ghost draft entry (v7): only while the composer is empty and no
+              draft exists yet — the amber wing marks where Hermes comes in. */}
+          {!composerText && c.draft.status === "not_started" && (
+            <button
+              type="button"
+              onClick={() => requestDraft()}
+              title={`${followup ? "Draft a follow-up with Hermes" : "Draft with Hermes"} · d`}
+              className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[0.71875rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              {/* presence amber (v4): the wing marks where Hermes comes in */}
+              <span className="flex shrink-0" style={{ color: "var(--hermes)" }}>
+                <HermesMark className="size-3.5" strokeWidth={2.2} />
+              </span>
+              <span className="hidden sm:inline">
+                {followup ? "Draft follow-up" : "Draft with Hermes"}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={sendMock}

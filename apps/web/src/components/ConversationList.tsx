@@ -8,18 +8,14 @@ import {
   importantGroup,
   isSentDone,
   sentGroup,
+  type SectionKey,
 } from "@/lib/derive";
 import { cn } from "@/lib/utils";
 import { ConversationRow } from "@/components/ConversationRow";
 import { EmptyView, ErrorState, ListSkeleton } from "@/components/StatusStates";
 import { SourceIcon } from "@/components/SourceIcon";
+import { TickNum } from "@/components/ui/tick-num";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-
-const SENT_GROUP_LABEL = {
-  followup: "Needs follow-up",
-  awaiting: "Awaiting",
-  done: "Done",
-} as const;
 
 export function ConversationList() {
   const loadState = useInboxStore((s) => s.loadState);
@@ -29,8 +25,9 @@ export function ConversationList() {
   const sortModes = useInboxStore((s) => s.sortModes);
   const showDoneInSent = useInboxStore((s) => s.showDoneInSent);
   const toggleShowDone = useInboxStore((s) => s.toggleShowDone);
-  const fyiCollapsed = useInboxStore((s) => s.fyiCollapsed);
-  const toggleFyiCollapsed = useInboxStore((s) => s.toggleFyiCollapsed);
+  const collapsed = useInboxStore((s) => s.collapsed);
+  const toggleSection = useInboxStore((s) => s.toggleSection);
+  const exitingIds = useInboxStore((s) => s.exitingIds);
   const selectedId = useInboxStore((s) => s.selectedId);
   const selectId = useInboxStore((s) => s.selectId);
   const retryLoad = useInboxStore((s) => s.retryLoad);
@@ -41,8 +38,15 @@ export function ConversationList() {
   // Derive with useMemo so the render never depends on a fresh-array snapshot.
   const list = useMemo(
     () =>
-      deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, fyiCollapsed, now),
-    [conversations, activeView, filters, sortMode, showDoneInSent, fyiCollapsed, now],
+      deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, collapsed, now),
+    [conversations, activeView, filters, sortMode, showDoneInSent, collapsed, now],
+  );
+  // The view's honest population under the CURRENT filters, folds ignored —
+  // the title count and every fold-header count must say exactly what's there
+  // (F1 rule, generalized in v7 to every section).
+  const population = useMemo(
+    () => deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, null, now),
+    [conversations, activeView, filters, sortMode, showDoneInSent, now],
   );
   const filtered = anyFilterActive(filters);
 
@@ -52,31 +56,37 @@ export function ConversationList() {
     [conversations, activeView],
   );
 
-  // Important's FYI population under the CURRENT filters, collapse ignored —
-  // the fold header's count must say exactly what expanding will reveal.
-  const fyiMatching = useMemo(() => {
-    if (activeView !== "important") return 0;
-    return deriveVisible(conversations, "important", filters, "default", showDoneInSent, false, now)
-      .filter((c) => importantGroup(c) === "fyi").length;
-  }, [conversations, activeView, filters, showDoneInSent, now]);
-
   // Group headers only in the default order — an override flattens (v5/v6).
   const grouped =
     (activeView === "sent" || activeView === "important") && sortMode === "default";
 
+  const row = (c: Conversation) => (
+    <ConversationRow
+      key={c.id}
+      conversation={c}
+      view={activeView}
+      selected={c.id === selectedId}
+      exiting={exitingIds.includes(c.id)}
+      now={now}
+      onClick={() => selectId(c.id)}
+    />
+  );
+
   return (
-    <div className="flex h-full min-w-0 flex-col border-r border-border">
+    // v7 motion-causality: a view switch cross-fades the whole pane (and a
+    // fresh view starts at the top — the remount resets scroll on purpose).
+    <div
+      key={activeView}
+      className="animate-view-fade flex h-full min-w-0 flex-col border-r border-border"
+    >
       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-b border-border px-4 py-1.5">
         <h2 className="flex items-center gap-2 text-[0.78125rem] font-semibold tracking-[-0.01em]">
           {VIEW_META[activeView].label}
           {/* An errored sync can't vouch for a count — show unknown, not stale.
-              The FYI fold is display-only: folded rows stay in the view's
-              population, so the title count must agree with the rail (F1). */}
+              Folds are display-only: folded rows stay in the view's population,
+              so the title count always agrees with the rail (F1). */}
           <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[0.65625rem] tabular-nums text-muted-foreground">
-            {loadState === "error"
-              ? "—"
-              : list.length +
-                (activeView === "important" && grouped && fyiCollapsed ? fyiMatching : 0)}
+            {loadState === "error" ? "—" : <TickNum value={population.length} />}
           </span>
         </h2>
         {/* One-line semantics so the view model is self-evident (v5). */}
@@ -106,41 +116,30 @@ export function ConversationList() {
                 <span className="tnum font-mono tabular-nums">({doneCount})</span>
               </button>
             )}
-            {activeView === "important" && grouped ? (
+            {grouped && activeView === "important" ? (
               <ImportantSections
                 list={list}
-                fyiMatching={fyiMatching}
-                fyiCollapsed={fyiCollapsed}
-                onToggleFyi={toggleFyiCollapsed}
+                population={population}
+                collapsed={collapsed}
+                toggleSection={toggleSection}
                 filtered={filtered}
-                selectedId={selectedId}
-                selectId={selectId}
+                row={row}
+              />
+            ) : grouped && activeView === "sent" ? (
+              <SentSections
+                list={list}
+                population={population}
+                collapsed={collapsed}
+                toggleSection={toggleSection}
+                filtered={filtered}
+                showDone={showDoneInSent}
                 now={now}
+                row={row}
               />
             ) : list.length === 0 ? (
               <EmptyView view={activeView} filtered={filtered} />
             ) : (
-              list.map((c, i) => {
-                const group = grouped ? sentGroup(c, now) : null;
-                const prev = grouped && i > 0 ? sentGroup(list[i - 1], now) : null;
-                const showHeader = group !== null && group !== prev;
-                return (
-                  <div key={c.id}>
-                    {showHeader && (
-                      <p className="border-b border-border/60 bg-muted/20 px-4 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground">
-                        {SENT_GROUP_LABEL[group]}
-                      </p>
-                    )}
-                    <ConversationRow
-                      conversation={c}
-                      view={activeView}
-                      selected={c.id === selectedId}
-                      now={now}
-                      onClick={() => selectId(c.id)}
-                    />
-                  </div>
-                );
-              })
+              list.map(row)
             )}
           </>
         )}
@@ -149,85 +148,116 @@ export function ConversationList() {
   );
 }
 
+/** Grouped section header (v7): every header is a fold control — chevron +
+    honest population count stay visible while its rows hide (F1 rule). The
+    chevron sits muted at rest and strengthens on hover; a collapsed section
+    keeps it at full strength — hidden rows must be legible at rest. */
+function SectionHeader({
+  label,
+  count,
+  collapsed,
+  onToggle,
+}: {
+  label: string;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      className={cn(
+        "group flex w-full items-center gap-1 border-b border-border/60 bg-muted/20 px-4 py-1 text-left",
+        "text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground",
+        "transition-colors hover:bg-accent/25 hover:text-foreground",
+      )}
+    >
+      {collapsed ? (
+        <ChevronRight className="size-3" aria-hidden />
+      ) : (
+        <ChevronDown className="size-3 opacity-50 transition-opacity group-hover:opacity-100" aria-hidden />
+      )}
+      {label}
+      <span className="tnum font-mono tabular-nums">
+        (<TickNum value={count} />)
+      </span>
+    </button>
+  );
+}
+
+const plainHeaderClass =
+  "border-b border-border/60 bg-muted/20 px-4 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground";
+
+function SectionEmpty({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="border-b border-border/60 px-4 py-2.5 text-[0.71875rem] text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
 /** Important's two sections (v6), grouped like Sent's needs-follow-up/awaiting
-    pattern: NEEDS REPLY on top, FYI below behind a fold. Each section carries
-    its own calm empty state — an absent header would hide the model. */
+    pattern: NEEDS REPLY on top, FYI below. Both headers are fold controls (v7);
+    each carries a calm empty state — an absent header would hide the model. */
 function ImportantSections({
   list,
-  fyiMatching,
-  fyiCollapsed,
-  onToggleFyi,
+  population,
+  collapsed,
+  toggleSection,
   filtered,
-  selectedId,
-  selectId,
-  now,
+  row,
 }: {
   list: Conversation[];
-  fyiMatching: number;
-  fyiCollapsed: boolean;
-  onToggleFyi: () => void;
+  population: Conversation[];
+  collapsed: Partial<Record<SectionKey, boolean>>;
+  toggleSection: (key: SectionKey) => void;
   filtered: boolean;
-  selectedId: string | null;
-  selectId: (id: string) => void;
-  now: number;
+  row: (c: Conversation) => React.ReactNode;
 }) {
-  const nrRows = list.filter((c) => importantGroup(c) === "needs_reply");
-  const fyiRows = list.filter((c) => importantGroup(c) === "fyi"); // empty while folded
+  const nrRows = list.filter((c) => importantGroup(c) === "needs_reply"); // empty while folded
+  const fyiRows = list.filter((c) => importantGroup(c) === "fyi");
+  const nrCount = population.filter((c) => importantGroup(c) === "needs_reply").length;
+  const fyiCount = population.filter((c) => importantGroup(c) === "fyi").length;
 
   // Both sections empty → one calm view-level state, not two hollow shells.
-  if (nrRows.length === 0 && fyiMatching === 0)
-    return <EmptyView view="important" filtered={filtered} />;
-
-  const row = (c: Conversation) => (
-    <ConversationRow
-      key={c.id}
-      conversation={c}
-      view="important"
-      selected={c.id === selectedId}
-      now={now}
-      onClick={() => selectId(c.id)}
-    />
-  );
-  const sectionHeaderClass =
-    "border-b border-border/60 bg-muted/20 px-4 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground";
+  if (nrCount === 0 && fyiCount === 0) return <EmptyView view="important" filtered={filtered} />;
 
   return (
     <>
-      <p className={sectionHeaderClass}>Needs reply</p>
-      {nrRows.length > 0 ? (
-        nrRows.map(row)
-      ) : (
-        <SectionEmpty>
-          {filtered ? "No matches waiting on you." : "Nothing needs your reply."}
-        </SectionEmpty>
-      )}
-
-      {fyiMatching > 0 ? (
+      {nrCount > 0 ? (
         <>
-          {/* The FYI header IS the fold control — count stays honest while
-              rows hide; nothing silently disappears. */}
-          <button
-            type="button"
-            onClick={onToggleFyi}
-            aria-expanded={!fyiCollapsed}
-            className={cn(
-              sectionHeaderClass,
-              "flex w-full items-center gap-1 text-left transition-colors hover:bg-accent/25 hover:text-foreground",
-            )}
-          >
-            {fyiCollapsed ? (
-              <ChevronRight className="size-3" aria-hidden />
-            ) : (
-              <ChevronDown className="size-3" aria-hidden />
-            )}
-            FYI
-            <span className="tnum font-mono tabular-nums">({fyiMatching})</span>
-          </button>
-          {!fyiCollapsed && fyiRows.map(row)}
+          <SectionHeader
+            label="Needs reply"
+            count={nrCount}
+            collapsed={!!collapsed["important.needs_reply"]}
+            onToggle={() => toggleSection("important.needs_reply")}
+          />
+          {!collapsed["important.needs_reply"] && nrRows.map(row)}
         </>
       ) : (
         <>
-          <p className={sectionHeaderClass}>FYI</p>
+          <p className={plainHeaderClass}>Needs reply</p>
+          <SectionEmpty>
+            {filtered ? "No matches waiting on you." : "Nothing needs your reply."}
+          </SectionEmpty>
+        </>
+      )}
+
+      {fyiCount > 0 ? (
+        <>
+          <SectionHeader
+            label="FYI"
+            count={fyiCount}
+            collapsed={!!collapsed["important.fyi"]}
+            onToggle={() => toggleSection("important.fyi")}
+          />
+          {!collapsed["important.fyi"] && fyiRows.map(row)}
+        </>
+      ) : (
+        <>
+          <p className={plainHeaderClass}>FYI</p>
           <SectionEmpty>
             {filtered ? "No matches to know about." : "Nothing new to know."}
           </SectionEmpty>
@@ -237,11 +267,72 @@ function ImportantSections({
   );
 }
 
-function SectionEmpty({ children }: { children: React.ReactNode }) {
+/** Sent's grouped sections: Needs follow-up (stalest first) above Awaiting
+    (fresh). Their headers fold (v7); they render only when populated — Sent
+    never promised empty-section shells (that's Important's contract). Done
+    rides along when the toggle shows it, under a plain header: the toggle IS
+    its control, and a second fold on top would be two switches for one lamp. */
+function SentSections({
+  list,
+  population,
+  collapsed,
+  toggleSection,
+  filtered,
+  showDone,
+  now,
+  row,
+}: {
+  list: Conversation[];
+  population: Conversation[];
+  collapsed: Partial<Record<SectionKey, boolean>>;
+  toggleSection: (key: SectionKey) => void;
+  filtered: boolean;
+  showDone: boolean;
+  now: number;
+  row: (c: Conversation) => React.ReactNode;
+}) {
+  const rowsOf = (g: "followup" | "awaiting" | "done") =>
+    list.filter((c) => sentGroup(c, now) === g);
+  const countOf = (g: "followup" | "awaiting" | "done") =>
+    population.filter((c) => sentGroup(c, now) === g).length;
+
+  if (population.length === 0) return <EmptyView view="sent" filtered={filtered} />;
+
+  const followupCount = countOf("followup");
+  const awaitingCount = countOf("awaiting");
+  const doneRows = rowsOf("done");
+
   return (
-    <p className="border-b border-border/60 px-4 py-2.5 text-[0.71875rem] text-muted-foreground">
-      {children}
-    </p>
+    <>
+      {followupCount > 0 && (
+        <>
+          <SectionHeader
+            label="Needs follow-up"
+            count={followupCount}
+            collapsed={!!collapsed["sent.followup"]}
+            onToggle={() => toggleSection("sent.followup")}
+          />
+          {!collapsed["sent.followup"] && rowsOf("followup").map(row)}
+        </>
+      )}
+      {awaitingCount > 0 && (
+        <>
+          <SectionHeader
+            label="Awaiting"
+            count={awaitingCount}
+            collapsed={!!collapsed["sent.awaiting"]}
+            onToggle={() => toggleSection("sent.awaiting")}
+          />
+          {!collapsed["sent.awaiting"] && rowsOf("awaiting").map(row)}
+        </>
+      )}
+      {showDone && doneRows.length > 0 && (
+        <>
+          <p className={plainHeaderClass}>Done</p>
+          {doneRows.map(row)}
+        </>
+      )}
+    </>
   );
 }
 

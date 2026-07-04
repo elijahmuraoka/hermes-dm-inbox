@@ -2,6 +2,17 @@
 
 Deferred items, with provenance. Phase 0 = mock UI slice; Phase 1 = first real backend/sync work.
 
+## Polish — from the v7 feel pass (2026-07-04, non-blocking)
+
+- **Touch affordance for row actions.** The v7 hover cluster is hover-only; on touch devices the
+  triage mouse-path is tap row → thread-header done/snooze buttons. Fine for the desktop-first
+  slice; revisit (swipe actions?) if a real touch audience appears.
+- **Send-from-Important commits its data flip at 150ms** (exit-then-commit) — the composer clears
+  instantly but the appended bubble lands with the row's exit. Imperceptible in practice;
+  documented so nobody "fixes" the delay without knowing why it exists (DESIGN §6 v7).
+- **Priority's mouse path is ⌘K only** (Cycle priority command). The row dot is too small to be a
+  click target and an empty slot can't be one; acceptable — priority correction is a rare act.
+
 ## Polish — from Elijah's v6 pressure-test (2026-07-04, non-blocking)
 
 F1 (title count vs rail disagreement while FYI folded) was fixed pre-ship; the rest were accepted

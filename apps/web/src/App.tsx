@@ -9,7 +9,9 @@ import { HermesDraftPanel } from "@/components/HermesDraftPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutSheet } from "@/components/ShortcutSheet";
 import { NoSelection } from "@/components/StatusStates";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 
 /** ONE mechanism decides which draft surface exists (pressure-test nit):
     CSS-hiding kept the losing surface mounted — duplicate DOM for probes and
@@ -35,6 +37,7 @@ export default function App() {
   const drawerOpen = useInboxStore((s) => s.drawerOpen);
   const setDrawer = useInboxStore((s) => s.setDrawer);
   const setView = useInboxStore((s) => s.setView);
+  const hintDismissed = useInboxStore((s) => s.hintDismissed);
   const isXl = useIsXl();
 
   // Mock initial sync → ready, then select the first row (shows skeletons briefly).
@@ -65,6 +68,8 @@ export default function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
+        {/* First-run affordance (v7): one dismissible line, not a tour. */}
+        {!hintDismissed && <HintBar />}
         <main className="flex min-h-0 flex-1">
           <h1 className="sr-only">Hermes DM Inbox</h1>
           {/* List — full width in single-pane mode, fixed rail from lg. */}
@@ -125,6 +130,28 @@ export default function App() {
 
       <CommandPalette />
       <ShortcutSheet />
+    </div>
+  );
+}
+
+/** One quiet line under the topbar until dismissed once (localStorage) —
+    the unlabeled cockpit gets a signpost, not a tour. */
+function HintBar() {
+  const dismissHint = useInboxStore((s) => s.dismissHint);
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-muted/20 px-3 text-[0.6875rem] text-muted-foreground">
+      <span className="flex items-center gap-1 truncate">
+        Press <Kbd>?</Kbd> for shortcuts · <Kbd>j</Kbd>
+        <Kbd>k</Kbd> to move
+      </span>
+      <button
+        type="button"
+        onClick={dismissHint}
+        aria-label="Dismiss hint"
+        className="ml-auto flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <X className="size-3" />
+      </button>
     </div>
   );
 }

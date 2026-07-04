@@ -20,7 +20,9 @@ import {
   DEFAULT_SORTS,
   NO_FILTERS,
   deriveVisible,
+  type CollapsedSections,
   type InboxFilters,
+  type SectionKey,
   type SortMode,
 } from "@/lib/derive";
 import type { AuditEvent } from "@/lib/types";
@@ -46,7 +48,9 @@ interface InboxState {
   filters: InboxFilters;
   sortModes: Record<ViewId, SortMode>; // per-view sort override ("default" = specced order)
   showDoneInSent: boolean; // Sent's "Show done" toggle — done rows hide by default
-  fyiCollapsed: boolean; // Important's FYI section fold — header + honest count stay visible
+  collapsed: CollapsedSections; // v7: per-section folds — header + honest count stay visible
+  exitingIds: string[]; // v7 motion-causality: rows animating out before their mutation commits
+  hintDismissed: boolean; // first-run hint bar under the topbar, gone once dismissed
   selectedId: string | null;
   mobilePane: "list" | "thread"; // active pane below the lg breakpoint
   draftSheetOpen: boolean; // bottom-sheet draft panel below xl — the hero loop must be visible everywhere
@@ -85,7 +89,8 @@ interface InboxState {
   clearFilters: () => void;
   setSortMode: (mode: SortMode) => void; // for the ACTIVE view
   toggleShowDone: () => void; // Sent only
-  toggleFyiCollapsed: () => void; // Important only — fold/unfold the FYI section
+  toggleSection: (key: SectionKey) => void; // fold/unfold a grouped section (v7)
+  dismissHint: () => void; // first-run hint bar — persists via localStorage
 
   // triage
   markDone: (id?: string) => void;
@@ -115,14 +120,36 @@ interface InboxState {
 }
 
 // The FYI fold survives reloads (pressure-test F5) — a deliberate display
-// preference, unlike filters/sort which reset to honest defaults.
+// preference, unlike filters/sort which reset to honest defaults. The other
+// section folds (v7) are session-only: hiding your own triage queue or Sent's
+// groups is a moment's choice, not a standing preference.
 const FYI_FOLD_KEY = "hdi.fyi-collapsed";
-function readFyiCollapsed(): boolean {
+function readCollapsed(): CollapsedSections {
   try {
-    return localStorage.getItem(FYI_FOLD_KEY) === "1";
+    return localStorage.getItem(FYI_FOLD_KEY) === "1" ? { "important.fyi": true } : {};
+  } catch {
+    return {};
+  }
+}
+
+// First-run hint bar: one line under the topbar until dismissed once.
+const HINT_KEY = "hdi.hint-dismissed";
+function readHintDismissed(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
   } catch {
     return false;
   }
+}
+
+// Motion-causality (v7): a row that a mutation removes from the CURRENT view
+// animates out first (slide+fade+collapse, the list closes the gap), and the
+// data flips when the row is already gone. A row that stays visible (done in
+// All, send in Sent) commits instantly — motion only where state changes the
+// view. Reduced motion skips the delay entirely.
+const EXIT_MS = 150;
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function pushAudit(
@@ -159,7 +186,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   filters: NO_FILTERS,
   sortModes: { ...DEFAULT_SORTS },
   showDoneInSent: false,
-  fyiCollapsed: readFyiCollapsed(),
+  collapsed: readCollapsed(),
+  exitingIds: [],
+  hintDismissed: readHintDismissed(),
   selectedId: null,
   mobilePane: "list",
   draftSheetOpen: false,
@@ -173,7 +202,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   studioFocusTick: 0,
 
   visibleConversations: () => {
-    const { conversations, activeView, filters, sortModes, showDoneInSent, fyiCollapsed, now } =
+    const { conversations, activeView, filters, sortModes, showDoneInSent, collapsed, now } =
       get();
     return deriveVisible(
       conversations,
@@ -181,7 +210,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       filters,
       sortModes[activeView],
       showDoneInSent,
-      fyiCollapsed,
+      collapsed,
       now,
     );
   },
@@ -221,18 +250,30 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
   },
 
-  // Folding FYI can orphan a selected FYI row — same re-anchor rule as above.
-  toggleFyiCollapsed: () => {
-    const next = !get().fyiCollapsed;
-    try {
-      localStorage.setItem(FYI_FOLD_KEY, next ? "1" : "0");
-    } catch {
-      // storage unavailable → the fold is session-only; still fully usable
+  // Folding a section can orphan a selected row — same re-anchor rule as above.
+  // Only the FYI fold persists (F5); the rest are session-only display moves.
+  toggleSection: (key) => {
+    const next = { ...get().collapsed, [key]: !get().collapsed[key] };
+    if (key === "important.fyi") {
+      try {
+        localStorage.setItem(FYI_FOLD_KEY, next[key] ? "1" : "0");
+      } catch {
+        // storage unavailable → the fold is session-only; still fully usable
+      }
     }
-    set({ fyiCollapsed: next });
+    set({ collapsed: next });
     const { visibleConversations, selectedId } = get();
     const list = visibleConversations();
     if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
+  },
+
+  dismissHint: () => {
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {
+      // storage unavailable → the hint returns next session; still dismissible
+    }
+    set({ hintDismissed: true });
   },
 
   selectNext: () => {
@@ -271,34 +312,41 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   markDone: (id) => {
     const target = id ?? get().selectedId;
-    if (!target) return;
+    if (!target || get().exitingIds.includes(target)) return;
+    const conv = get().conversations.find((c) => c.id === target);
+    if (!conv) return;
     // On an FYI thread, `e` is an ACKNOWLEDGE (v6): same done transition —
     // it leaves Important and lives on in All — but the audit trail keeps
     // the distinction between clearing info and closing a conversation.
-    const isAck = get().conversations.find((c) => c.id === target)?.status === "fyi";
+    const isAck = conv.status === "fyi";
     // Serial triage: remember where we were so selection can ADVANCE to the
     // next row (Superhuman behavior) — yanking to the top made mid-list
     // triage unusable (pressure-test blocker #3).
     const beforeIdx = get()
       .visibleConversations()
       .findIndex((c) => c.id === target);
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === target ? { ...c, status: "done" as const, unread: false } : c,
-      ),
-      audit: pushAudit(
-        s.audit,
-        {
-          actor: "human",
-          surface: "ui",
-          action: isAck ? "triage.ack" : "triage.done",
-          resource: target,
-          result: "allowed",
-        },
-        s.now,
-      ),
-    }));
-    advanceSelection(set, get, beforeIdx);
+    const predicted = get().conversations.map((c) =>
+      c.id === target ? { ...c, status: "done" as const, unread: false } : c,
+    );
+    exitThenCommit(set, get, target, predicted, () => {
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === target ? { ...c, status: "done" as const, unread: false } : c,
+        ),
+        audit: pushAudit(
+          s.audit,
+          {
+            actor: "human",
+            surface: "ui",
+            action: isAck ? "triage.ack" : "triage.done",
+            resource: target,
+            result: "allowed",
+          },
+          s.now,
+        ),
+      }));
+      advanceSelection(set, get, beforeIdx);
+    });
   },
 
   // Snooze (v5): hide from the working views until it returns — status is
@@ -306,23 +354,27 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   // away). Mock return time: tomorrow morning relative to the fixed clock.
   snooze: (id) => {
     const target = id ?? get().selectedId;
-    if (!target) return;
+    if (!target || get().exitingIds.includes(target)) return;
     const beforeIdx = get()
       .visibleConversations()
       .findIndex((c) => c.id === target);
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === target
-          ? { ...c, snoozedUntil: new Date(s.now + 16 * 3600_000).toISOString() }
-          : c,
-      ),
-      audit: pushAudit(
-        s.audit,
-        { actor: "human", surface: "ui", action: "triage.snooze", resource: target, result: "allowed" },
-        s.now,
-      ),
-    }));
-    advanceSelection(set, get, beforeIdx);
+    const until = new Date(get().now + 16 * 3600_000).toISOString();
+    const predicted = get().conversations.map((c) =>
+      c.id === target ? { ...c, snoozedUntil: until } : c,
+    );
+    exitThenCommit(set, get, target, predicted, () => {
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === target ? { ...c, snoozedUntil: until } : c,
+        ),
+        audit: pushAudit(
+          s.audit,
+          { actor: "human", surface: "ui", action: "triage.snooze", resource: target, result: "allowed" },
+          s.now,
+        ),
+      }));
+      advanceSelection(set, get, beforeIdx);
+    });
   },
 
   // Priority is Hermes-computed but human-correctable: p cycles the tiers.
@@ -590,17 +642,24 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   sendMock: () => {
     const conv = get().selected();
     const text = get().composerText.trim();
-    if (!conv || !text) return;
+    if (!conv || !text || get().exitingIds.includes(conv.id)) return;
     const active = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     const fromHermes =
       conv.draft.status === "added_to_chat" ||
       (conv.draft.status === "edited" && !!active);
     const routed = suggestPostSend(text);
-    set((s) => {
+    // The composer clears the instant you send — that's the send being felt.
+    // Only the data flip waits for the row's exit animation (Important only;
+    // in Sent/All the row stays visible and everything commits at once).
+    set({ composerText: "", composerAttach: false });
+    const predicted = get().conversations.map((c) =>
+      c.id === conv.id
+        ? { ...c, status: "sent" as const, unread: false, lastActivity: new Date(get().now).toISOString() }
+        : c,
+    );
+    exitThenCommit(set, get, conv.id, predicted, () => set((s) => {
       const nowIso = new Date(s.now).toISOString();
       return {
-        composerText: "",
-        composerAttach: false,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
           const mid = `${c.id}m${c.messages.length + 1}`;
@@ -641,7 +700,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       };
-    });
+    }));
   },
 
   // Recoverable by design: retry runs a fresh mock sync and restores the fixtures.
@@ -671,6 +730,42 @@ function applyFilters(
   set({ filters: { ...get().filters, ...patch }, mobilePane: "list", drawerOpen: false });
   const first = get().visibleConversations()[0] ?? null;
   set({ selectedId: first?.id ?? null });
+}
+
+// v7 motion-causality core: predict (against the mutated copy) whether the
+// row survives the CURRENT view. If it leaves, mark it exiting for EXIT_MS so
+// the list can play the slide+fade+collapse, then run the real commit — the
+// data flips when the row is already gone. Commits re-read live state, never
+// the prediction snapshot: another thread may have mutated in the window.
+function exitThenCommit(
+  set: (partial: Partial<InboxState>) => void,
+  get: () => InboxState,
+  id: string,
+  predicted: Conversation[],
+  commit: () => void,
+) {
+  const { activeView, filters, sortModes, showDoneInSent, collapsed, now } = get();
+  const wouldRemain = deriveVisible(
+    predicted,
+    activeView,
+    filters,
+    sortModes[activeView],
+    showDoneInSent,
+    collapsed,
+    now,
+  ).some((c) => c.id === id);
+  const visibleNow = get()
+    .visibleConversations()
+    .some((c) => c.id === id);
+  if (!visibleNow || wouldRemain || prefersReducedMotion()) {
+    commit();
+    return;
+  }
+  set({ exitingIds: [...get().exitingIds, id] });
+  window.setTimeout(() => {
+    commit();
+    set({ exitingIds: get().exitingIds.filter((x) => x !== id) });
+  }, EXIT_MS);
 }
 
 // After a triage action removes a row from the view, select the row that now

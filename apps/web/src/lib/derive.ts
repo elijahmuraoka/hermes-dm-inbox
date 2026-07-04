@@ -35,6 +35,16 @@ export const DEFAULT_SORTS: Record<ViewId, SortMode> = {
   all: "default",
 };
 
+/** v7: every grouped section header is a fold control (chevron + honest
+    count), generalizing v6's FYI fold. Sent's Done section is deliberately
+    absent — the "Show done" toggle is already its one control. */
+export type SectionKey =
+  | "important.needs_reply"
+  | "important.fyi"
+  | "sent.followup"
+  | "sent.awaiting";
+export type CollapsedSections = Partial<Record<SectionKey, boolean>>;
+
 /** A Hermes draft exists on this thread and hasn't been sent yet. */
 export function hasDraft(c: Conversation): boolean {
   return c.draft.versions.length > 0 && c.draft.status !== "sent_mock";
@@ -90,24 +100,28 @@ export function deriveVisible(
   filters: InboxFilters,
   sortMode: SortMode,
   showDoneInSent: boolean,
-  fyiCollapsed: boolean,
+  collapsed: CollapsedSections | null, // null = population mode: ignore folds
   now: number,
 ): Conversation[] {
+  // A collapse hides a SECTION — a grouped-display concept, so it only bites
+  // in the default (grouped) order. Under a flat override there is no section
+  // header to vouch for hidden rows, and rows with no visible header would
+  // silently disappear. Callers pass null to count a view's honest population
+  // (title/rail counts, F1 rule) regardless of what's folded away.
+  const folded = (key: SectionKey) =>
+    !!collapsed && sortMode === "default" && !!collapsed[key];
   const inView = (c: Conversation) => {
     if (view === "all") return true;
     if (isSnoozed(c, now)) return false;
     if (view === "important") {
       if (!isImportant(c, now)) return false;
-      // Collapse hides the FYI SECTION — a grouped-display concept, so it
-      // only bites in the default (grouped) order. Under a flat override
-      // there is no section header to vouch for hidden rows, and rows with
-      // no visible header would silently disappear.
-      if (c.status === "fyi" && fyiCollapsed && sortMode === "default") return false;
-      return true;
+      return !folded(`important.${importantGroup(c)}`);
     }
     // Sent = open threads on your side of the net; done rides along only
     // behind the "Show done" toggle (and only if the last word was yours).
-    return c.status === "sent" || (showDoneInSent && isSentDone(c));
+    if (!(c.status === "sent" || (showDoneInSent && isSentDone(c)))) return false;
+    const group = sentGroup(c, now);
+    return group === "done" || !folded(`sent.${group}`);
   };
   const matches = (c: Conversation) =>
     inView(c) &&

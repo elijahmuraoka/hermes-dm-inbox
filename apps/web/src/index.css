@@ -319,3 +319,56 @@
 .animate-stream {
   animation: stream-line 260ms var(--ease-house) both;
 }
+
+/* ── v7 motion-causality ─────────────────────────────────────────────────────
+   Every animation explains a state change; nothing is decorative. Reduced
+   motion kills all of these via the global media rule above (and the store
+   skips the exit-commit delay entirely). */
+
+/* A triaged/sent row leaves the view: fade+slide first, then the height
+   collapses so the rows below close the gap themselves. The mutation commits
+   at 150ms, when the row is already gone. */
+@keyframes row-exit {
+  0% {
+    height: 2.5rem;
+    opacity: 1;
+    transform: translateX(0);
+  }
+  55% {
+    height: 2.5rem;
+    opacity: 0;
+    transform: translateX(0.5rem);
+  }
+  100% {
+    height: 0;
+    opacity: 0;
+    transform: translateX(0.5rem);
+    border-bottom-width: 0;
+  }
+}
+.animate-row-exit {
+  animation: row-exit 150ms var(--ease-house) forwards;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Counts tick when they change — the new number drops in (TickNum). */
+@keyframes count-tick {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25em);
+  }
+}
+.animate-count-tick {
+  animation: count-tick 140ms var(--ease-house);
+}
+
+/* View switches cross-fade the list — subtle, under 120ms. */
+@keyframes view-fade {
+  from {
+    opacity: 0;
+  }
+}
+.animate-view-fade {
+  animation: view-fade 100ms var(--ease-house);
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Command } from "cmdk";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { VIEW_META, SOURCE_META, type SourceId, type ViewId } from "@/lib/types";
-import { anyFilterActive } from "@/lib/derive";
+import { anyFilterActive, type SectionKey } from "@/lib/derive";
 import { PEOPLE } from "@/lib/mock-data";
 import { Kbd } from "@/components/ui/kbd";
 import { HermesMark } from "@/components/HermesMark";
@@ -11,6 +11,7 @@ import {
   Check,
   FileText,
   Filter,
+  Flag,
   Inbox,
   RefreshCw,
   Search,
@@ -18,6 +19,19 @@ import {
   User,
   X,
 } from "lucide-react";
+
+// v7: every grouped section folds; the palette carries the ACTIVE view's
+// sections so folding stays keyboard-reachable (mouse path: the headers).
+const SECTION_COMMANDS: Partial<Record<ViewId, { key: SectionKey; label: string }[]>> = {
+  important: [
+    { key: "important.needs_reply", label: "Needs reply" },
+    { key: "important.fyi", label: "FYI" },
+  ],
+  sent: [
+    { key: "sent.followup", label: "Needs follow-up" },
+    { key: "sent.awaiting", label: "Awaiting" },
+  ],
+};
 
 type Scope = "global" | "selected" | "thread" | "source";
 
@@ -54,12 +68,13 @@ export function CommandPalette() {
   const setSortMode = useInboxStore((s) => s.setSortMode);
   const showDoneInSent = useInboxStore((s) => s.showDoneInSent);
   const toggleShowDone = useInboxStore((s) => s.toggleShowDone);
-  const fyiCollapsed = useInboxStore((s) => s.fyiCollapsed);
-  const toggleFyiCollapsed = useInboxStore((s) => s.toggleFyiCollapsed);
+  const collapsed = useInboxStore((s) => s.collapsed);
+  const toggleSection = useInboxStore((s) => s.toggleSection);
   const conversations = useInboxStore((s) => s.conversations);
   const setShortcuts = useInboxStore((s) => s.setShortcuts);
   const markDone = useInboxStore((s) => s.markDone);
   const snooze = useInboxStore((s) => s.snooze);
+  const togglePriority = useInboxStore((s) => s.togglePriority);
   const requestDraft = useInboxStore((s) => s.requestDraft);
   const addToChat = useInboxStore((s) => s.addToChat);
   const focusComposer = useInboxStore((s) => s.focusComposer);
@@ -203,14 +218,15 @@ export function CommandPalette() {
         icon: Check,
         run: withClose(() => toggleShowDone()),
       },
-      {
-        id: "important-fyi-fold",
-        label: fyiCollapsed ? "Important view: expand FYI" : "Important view: collapse FYI",
+      // Section folds for the ACTIVE view (v7) — the headers are the mouse path.
+      ...(SECTION_COMMANDS[activeView] ?? []).map(({ key, label }) => ({
+        id: `fold-${key}`,
+        label: `${VIEW_META[activeView].label} view: ${collapsed[key] ? "expand" : "collapse"} ${label}`,
         group: "Filter",
-        scope: "global",
+        scope: "global" as Scope,
         icon: Filter,
-        run: withClose(() => toggleFyiCollapsed()),
-      },
+        run: withClose(() => toggleSection(key)),
+      })),
       // Triage
       {
         id: "triage-done",
@@ -234,6 +250,19 @@ export function CommandPalette() {
         keys: "s",
         icon: ArrowRight,
         run: withClose(() => snooze()),
+        disabled: !selected,
+      },
+      {
+        id: "triage-priority",
+        // Hermes computes priority; p (and this command) is the human override.
+        label: selected
+          ? `Cycle priority (now ${selected.urgency})`
+          : "Cycle priority",
+        group: "Triage",
+        scope: "selected",
+        keys: "p",
+        icon: Flag,
+        run: withClose(() => togglePriority()),
         disabled: !selected,
       },
       // Draft
@@ -314,7 +343,7 @@ export function CommandPalette() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, fyiCollapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleFyiCollapsed, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
+  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, collapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleSection, markDone, snooze, togglePriority, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
     const order = ["Navigate", "Filter", "Triage", "Draft", "Dev"];

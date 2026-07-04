@@ -186,6 +186,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
   const addToChat = useInboxStore((s) => s.addToChat);
   const studioFocusTick = useInboxStore((s) => s.studioFocusTick);
   const [input, setInput] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -342,10 +343,18 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
                 e.currentTarget.blur();
               }
             }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             placeholder="Tell Hermes what to change…"
             aria-label="Refine the draft"
             className="max-h-[80px] min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[0.75rem] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
           />
+          {/* v7: the key lives ON the control — r focuses this input. */}
+          {!input && !inputFocused && (
+            <span aria-hidden className="mb-0.5 flex">
+              <Kbd>r</Kbd>
+            </span>
+          )}
           <button
             type="button"
             onClick={submit}

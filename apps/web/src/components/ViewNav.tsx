@@ -4,6 +4,7 @@ import { isImportant, isSnoozed } from "@/lib/derive";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Kbd } from "@/components/ui/kbd";
+import { TickNum } from "@/components/ui/tick-num";
 import { SourceIcon } from "@/components/SourceIcon";
 import { HermesMark } from "@/components/HermesMark";
 import { Layers, Moon } from "lucide-react";
@@ -17,6 +18,7 @@ export function ViewNav() {
   const conversations = useInboxStore((s) => s.conversations);
   const activeView = useInboxStore((s) => s.activeView);
   const setView = useInboxStore((s) => s.setView);
+  const setShortcuts = useInboxStore((s) => s.setShortcuts);
   const filters = useInboxStore((s) => s.filters);
   const now = useInboxStore((s) => s.now);
 
@@ -67,6 +69,7 @@ export function ViewNav() {
               type="button"
               onClick={() => setView(v)}
               aria-current={active ? "true" : undefined}
+              title={`${VIEW_META[v].label} — ${VIEW_META[v].key}`}
               className={cn(
                 "group relative flex h-8 items-center gap-2 rounded-md px-2 text-left text-[0.78125rem]",
                 "transition-colors duration-[var(--transition-duration)] ease-[var(--ease-house)]",
@@ -96,7 +99,10 @@ export function ViewNav() {
                   title={`${u} unread`}
                 />
               )}
-              <span className="tnum text-[0.6875rem] tabular-nums text-muted-foreground">{n}</span>
+              <TickNum
+                value={n}
+                className="tnum text-[0.6875rem] tabular-nums text-muted-foreground"
+              />
             </button>
           );
         })}
@@ -107,7 +113,7 @@ export function ViewNav() {
           <p className="flex h-6 items-center gap-2 px-2 text-[0.6875rem] text-muted-foreground">
             <Moon className="size-3" strokeWidth={2} aria-hidden />
             <span className="flex-1">Snoozed</span>
-            <span className="tnum tabular-nums">{snoozedCount}</span>
+            <TickNum value={snoozedCount} className="tnum tabular-nums" />
           </p>
         )}
       </div>
@@ -123,9 +129,14 @@ export function ViewNav() {
       </div>
 
       <div className="mt-auto flex items-center justify-between px-1.5">
-        <span className="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
+        {/* v7 mouse parity: the hint is also the door — click opens the sheet. */}
+        <button
+          type="button"
+          onClick={() => setShortcuts(true)}
+          className="flex items-center gap-1 rounded-md px-1 py-0.5 text-[0.6875rem] text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+        >
           <Kbd>?</Kbd> shortcuts
-        </span>
+        </button>
         <ModeToggle />
       </div>
     </nav>

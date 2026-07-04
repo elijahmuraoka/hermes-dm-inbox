@@ -204,7 +204,10 @@ Each ships with **all states** — default · hover · focus-visible · selected
    draft is ready (that's the leverage) and an `ack · e` affordance on FYI rows (know it, clear it);
    Sent shows days-quiet (`4d`) and a `nudge · d` affordance once stale (that's the time pressure);
    All shows a `snoozed` chip where honest (the skim omits nothing). `j/k` moves selection, `Enter`
-   opens.
+   opens. **v7 hover parity:** hovering fades the time + affordance chips into a quiet action cluster
+   in the same slot — done/ack · draft/nudge · snooze — tooltips carrying the keys; the row is a div
+   wrapping the select button plus the sibling cluster (buttons never nest), and the cluster is
+   `tabIndex=-1` (keyboard's path is `e`/`d`/`s`).
 2. **ViewNav** — the three views (one-line semantics `desc` under the list header) + sources with brand
    icons, live counts (tabular); active view uses `--primary` edge. A non-interactive **Snoozed count**
    sits under the views when > 0 (not a view — an honest tally of what's hidden). Lives in the **side
@@ -213,10 +216,12 @@ Each ships with **all states** — default · hover · focus-visible · selected
    **filter chip bar** (sources · unread · has-draft · active person · non-default sort) — filters and
    sort bite on every view, so they must be visible on every view. In Sent, a subtle **"Show done"
    toggle** with an honest count sits at the top of the list. In Important (v6), the two section
-   headers render even when a section is empty (each with a calm one-line empty state); the **FYI
-   header is the fold control** — chevron + honest count stay visible while its rows hide. When BOTH
-   sections are empty, the view renders one view-level empty state, not two hollow section shells
-   (pressure-test F6: accepted as better than the literal per-section spec).
+   headers render even when a section is empty (each with a calm one-line empty state). **v7: every
+   grouped section header is a fold control** — chevron + honest population count stay visible while
+   its rows hide (the F1 title==rail rule generalizes: folds never change a count). Only the FYI fold
+   persists (F5); the others are session-only. Sent's Done section keeps the toggle as its one control.
+   When BOTH Important sections are empty, the view renders one view-level empty state, not two hollow
+   section shells (pressure-test F6: accepted as better than the literal per-section spec).
 3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message or
    thread-level privacy chrome — v4). The Hermes strip carries only the triage rationale, with the HERMES
    label in presence amber.
@@ -235,7 +240,10 @@ Each ships with **all states** — default · hover · focus-visible · selected
 4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
    button, Send. `c` or `Enter`-in-thread focuses it; `⌘Enter` sends; `Esc` returns to list scope.
    Sending appends the outgoing message — **presented exactly as a real send** (diegetic rule, §7). That
-   v0 delivery is a local mock is code/commit/PR knowledge only.
+   v0 delivery is a local mock is code/commit/PR knowledge only. **v7 fast path:** clicking here is just
+   replying — zero Hermes steps; a ghost **"Draft with Hermes"** button (amber wing) sits at the right
+   edge while the composer is empty and no draft exists, so drafting is discoverable from where people
+   already are.
 5. **CommandPalette (⌘K)** — categorized (Navigate/Filter/Triage/Draft), shows scope
    (selected/thread/source/global) + the keycap for each; **<100ms perceived open**, no layout shift.
    The **person filter is a second page** (Raycast pattern) — 45 names never flood the main list;
@@ -260,6 +268,22 @@ Each ships with **all states** — default · hover · focus-visible · selected
   streaming in. **No** decorative motion, parallax, or bouncing. Honor `prefers-reduced-motion` (kill all).
 - **No layout shift** ever during draft/load (contract).
 
+> **DECISION v7 — Elijah, 2026-07-04 (the feel pass: motion-causality).** State changes must *explain
+> themselves* — nothing teleports, and nothing moves for decoration:
+> - **Rows animate out** on done / ack / snooze / send (slide + fade, then the height collapses so the
+>   list closes its own gap; 150ms house curve). Mechanism: **exit-then-commit** — the store predicts
+>   whether the mutation removes the row from the *current* view; if so, the row plays its exit and the
+>   data flips at 150ms, when it's already gone. A row that stays visible (done in All, send in Sent)
+>   commits instantly: motion only where the view actually changes. On send, the composer clears
+>   immediately (the send being felt); only the row's data flip rides the animation.
+> - **Counts tick** (rail, view title, section headers) — the new number drops in (140ms) so a shrinking
+>   queue visibly reacts to triage. First paint never ticks.
+> - **View switches cross-fade the list** (100ms, opacity only) and deliberately reset scroll — a fresh
+>   view starts at the top.
+> - Panel/sheet/drawer/palette entrances were already in place (sheet-up, drawer-in, scale-in) — verified.
+> - **`prefers-reduced-motion` kills all of it**, including the exit delay: the store commits immediately,
+>   so reduced-motion triage is *faster*, never just uglier.
+
 ---
 
 ## 7. Guardrails (non-negotiable)
@@ -275,6 +299,22 @@ Each ships with **all states** — default · hover · focus-visible · selected
 - **Accessibility:** WCAG AA contrast in **both** themes (verify the dark cyan on near-black + light blue on
   white), full keyboard operability, visible focus, reduced-motion, ARIA on the palette/modals.
 - **Privacy legibility beats aesthetics** wherever they conflict.
+
+> **DECISION v7 — Elijah, 2026-07-04 (the feel pass: mouse parity + fast path).** "Still a little hard
+> to use" was the unlabeled cockpit and the ceremony, not the model. Standing guardrails:
+> - **Mouse/hover parity:** every hotkey action has a **visible mouse path**. Row hover fades the
+>   time/affordance chips into a quiet action cluster in the same slot (done/ack · draft/nudge · snooze,
+>   Superhuman-style; tooltips carry the keys; cluster is `tabIndex=-1` — the keyboard path is the
+>   hotkeys, not forty tab stops). Thread header carries done/snooze. Section headers are fold controls
+>   (chevron + honest count; FYI's fold persists, the rest are session-only; Sent's Done section stays
+>   toggle-only — one control per lamp). Priority cycles via `p` and a ⌘K command. Keys render as
+>   subtle keycaps ON their controls (angle cards, Add to chat, Draft, studio chat's `r`).
+> - **Fast path first:** clicking the composer (or `c`) is **just replying** — zero Hermes steps, ever.
+>   Drafting is assistive, not modal: a ghost "Draft with Hermes" button sits at the composer's right
+>   edge (amber wing = presence) and yields the moment you type or a draft exists. The top three jobs —
+>   reply, follow-up nudge, triage-to-zero — each take ≤2 decisions with zero prior knowledge.
+> - **First-run affordance:** one dismissible hint line under the topbar ("Press ? for shortcuts ·
+>   j/k to move"), localStorage-dismissed, **not a tour**.
 
 ---
 
@@ -293,6 +333,10 @@ A slice is done only when, on a **real running app with mock data**, rendered an
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.
+9. **v7 feel:** the three jobs (reply · follow-up nudge · triage-to-zero) each complete **mouse-only**
+   at 1440 with zero prior knowledge; triaged/sent rows animate out and counts tick (and none of it
+   happens under `prefers-reduced-motion` — commits land instantly there); the first-run hint line
+   shows until dismissed and stays dismissed.
 
 ~~Ship 2–3 distinct variants of the **conversation-row + shared-badge** language within this one identity
 before locking (canon §8).~~ **DONE — locked 2026-07-03.** Three variants shipped (edge / ledger / card);
