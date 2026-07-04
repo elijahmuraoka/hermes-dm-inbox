@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
-import { VIEW_META, SOURCE_META, type SourceId } from "@/lib/types";
+import { VIEW_META, SOURCE_META, type Conversation, type SourceId } from "@/lib/types";
 import { PEOPLE } from "@/lib/mock-data";
 import {
   anyFilterActive,
   deriveVisible,
+  importantGroup,
   isSentDone,
   sentGroup,
 } from "@/lib/derive";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { ConversationRow } from "@/components/ConversationRow";
 import { EmptyView, ErrorState, ListSkeleton } from "@/components/StatusStates";
 import { SourceIcon } from "@/components/SourceIcon";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 
 const SENT_GROUP_LABEL = {
   followup: "Needs follow-up",
@@ -28,6 +29,8 @@ export function ConversationList() {
   const sortModes = useInboxStore((s) => s.sortModes);
   const showDoneInSent = useInboxStore((s) => s.showDoneInSent);
   const toggleShowDone = useInboxStore((s) => s.toggleShowDone);
+  const fyiCollapsed = useInboxStore((s) => s.fyiCollapsed);
+  const toggleFyiCollapsed = useInboxStore((s) => s.toggleFyiCollapsed);
   const selectedId = useInboxStore((s) => s.selectedId);
   const selectId = useInboxStore((s) => s.selectId);
   const retryLoad = useInboxStore((s) => s.retryLoad);
@@ -37,8 +40,9 @@ export function ConversationList() {
 
   // Derive with useMemo so the render never depends on a fresh-array snapshot.
   const list = useMemo(
-    () => deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, now),
-    [conversations, activeView, filters, sortMode, showDoneInSent, now],
+    () =>
+      deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, fyiCollapsed, now),
+    [conversations, activeView, filters, sortMode, showDoneInSent, fyiCollapsed, now],
   );
   const filtered = anyFilterActive(filters);
 
@@ -48,8 +52,17 @@ export function ConversationList() {
     [conversations, activeView],
   );
 
-  // Group headers only in Sent's default order — an override flattens.
-  const grouped = activeView === "sent" && sortMode === "default";
+  // Important's FYI population under the CURRENT filters, collapse ignored —
+  // the fold header's count must say exactly what expanding will reveal.
+  const fyiMatching = useMemo(() => {
+    if (activeView !== "important") return 0;
+    return deriveVisible(conversations, "important", filters, "default", showDoneInSent, false, now)
+      .filter((c) => importantGroup(c) === "fyi").length;
+  }, [conversations, activeView, filters, showDoneInSent, now]);
+
+  // Group headers only in the default order — an override flattens (v5/v6).
+  const grouped =
+    (activeView === "sent" || activeView === "important") && sortMode === "default";
 
   return (
     <div className="flex h-full min-w-0 flex-col border-r border-border">
@@ -88,7 +101,18 @@ export function ConversationList() {
                 <span className="tnum font-mono tabular-nums">({doneCount})</span>
               </button>
             )}
-            {list.length === 0 ? (
+            {activeView === "important" && grouped ? (
+              <ImportantSections
+                list={list}
+                fyiMatching={fyiMatching}
+                fyiCollapsed={fyiCollapsed}
+                onToggleFyi={toggleFyiCollapsed}
+                filtered={filtered}
+                selectedId={selectedId}
+                selectId={selectId}
+                now={now}
+              />
+            ) : list.length === 0 ? (
               <EmptyView view={activeView} filtered={filtered} />
             ) : (
               list.map((c, i) => {
@@ -117,6 +141,102 @@ export function ConversationList() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Important's two sections (v6), grouped like Sent's needs-follow-up/awaiting
+    pattern: NEEDS REPLY on top, FYI below behind a fold. Each section carries
+    its own calm empty state — an absent header would hide the model. */
+function ImportantSections({
+  list,
+  fyiMatching,
+  fyiCollapsed,
+  onToggleFyi,
+  filtered,
+  selectedId,
+  selectId,
+  now,
+}: {
+  list: Conversation[];
+  fyiMatching: number;
+  fyiCollapsed: boolean;
+  onToggleFyi: () => void;
+  filtered: boolean;
+  selectedId: string | null;
+  selectId: (id: string) => void;
+  now: number;
+}) {
+  const nrRows = list.filter((c) => importantGroup(c) === "needs_reply");
+  const fyiRows = list.filter((c) => importantGroup(c) === "fyi"); // empty while folded
+
+  // Both sections empty → one calm view-level state, not two hollow shells.
+  if (nrRows.length === 0 && fyiMatching === 0)
+    return <EmptyView view="important" filtered={filtered} />;
+
+  const row = (c: Conversation) => (
+    <ConversationRow
+      key={c.id}
+      conversation={c}
+      view="important"
+      selected={c.id === selectedId}
+      now={now}
+      onClick={() => selectId(c.id)}
+    />
+  );
+  const sectionHeaderClass =
+    "border-b border-border/60 bg-muted/20 px-4 py-1 text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground";
+
+  return (
+    <>
+      <p className={sectionHeaderClass}>Needs reply</p>
+      {nrRows.length > 0 ? (
+        nrRows.map(row)
+      ) : (
+        <SectionEmpty>
+          {filtered ? "No matches waiting on you." : "Nothing needs your reply."}
+        </SectionEmpty>
+      )}
+
+      {fyiMatching > 0 ? (
+        <>
+          {/* The FYI header IS the fold control — count stays honest while
+              rows hide; nothing silently disappears. */}
+          <button
+            type="button"
+            onClick={onToggleFyi}
+            aria-expanded={!fyiCollapsed}
+            className={cn(
+              sectionHeaderClass,
+              "flex w-full items-center gap-1 text-left transition-colors hover:bg-accent/25 hover:text-foreground",
+            )}
+          >
+            {fyiCollapsed ? (
+              <ChevronRight className="size-3" aria-hidden />
+            ) : (
+              <ChevronDown className="size-3" aria-hidden />
+            )}
+            FYI
+            <span className="tnum font-mono tabular-nums">({fyiMatching})</span>
+          </button>
+          {!fyiCollapsed && fyiRows.map(row)}
+        </>
+      ) : (
+        <>
+          <p className={sectionHeaderClass}>FYI</p>
+          <SectionEmpty>
+            {filtered ? "No matches to know about." : "Nothing new to know."}
+          </SectionEmpty>
+        </>
+      )}
+    </>
+  );
+}
+
+function SectionEmpty({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="border-b border-border/60 px-4 py-2.5 text-[0.71875rem] text-muted-foreground">
+      {children}
+    </p>
   );
 }
 

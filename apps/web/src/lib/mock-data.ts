@@ -42,6 +42,9 @@ export const PEOPLE: Record<string, Person> = {
   p7: P("p7", "Tom Byrne", "in/tom-byrne"),
   p8: P("p8", "Aiko Sato", "@aiko.sato"),
   p9: P("p9", "Luis Ortega", "@luisortega"),
+  p10: P("p10", "Rosa Lindqvist", "in/rosa-lindqvist"),
+  p11: P("p11", "Jonas Werner", "@jonas.werner"),
+  p12: P("p12", "Ren Ishida", "@renishida"),
 };
 
 const iso = (minAgo: number) => new Date(MOCK_NOW - minAgo * 60000).toISOString();
@@ -52,6 +55,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p1",
     source: "imessage",
     status: "needs_reply",
+    important: true,
     urgency: "high",
     unread: true,
     lastActivity: iso(7),
@@ -85,6 +89,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p2",
     source: "linkedin",
     status: "needs_reply",
+    important: true,
     urgency: "medium",
     unread: true,
     lastActivity: iso(52),
@@ -110,6 +115,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p3",
     source: "x",
     status: "needs_reply",
+    important: true,
     urgency: "normal",
     unread: false,
     lastActivity: iso(96),
@@ -135,6 +141,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p4",
     source: "linkedin",
     status: "needs_reply",
+    important: true,
     urgency: "medium",
     unread: false,
     lastActivity: iso(140),
@@ -168,6 +175,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p5",
     source: "imessage",
     status: "needs_reply",
+    important: true,
     urgency: "normal",
     unread: false,
     lastActivity: iso(210),
@@ -211,6 +219,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p6",
     source: "x",
     status: "sent",
+    important: true,
     urgency: "normal",
     unread: false,
     lastActivity: iso(1500),
@@ -236,6 +245,7 @@ const BASE_CONVERSATIONS: Conversation[] = [
     personId: "p7",
     source: "linkedin",
     status: "sent",
+    important: true,
     urgency: "medium",
     unread: false,
     lastActivity: iso(4600),
@@ -268,11 +278,13 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c8",
     personId: "p8",
     source: "imessage",
-    status: "done",
-    urgency: "normal",
+    // Important FYI: today's event moved — you'd walk to the wrong floor.
+    status: "fyi",
+    important: true,
+    urgency: "high",
     unread: true,
     lastActivity: iso(320),
-    hermesSuggestion: "Informational; no reply expected.",
+    hermesSuggestion: "Venue change for today's event — see it before you head out; no reply needed.",
     messages: [
       {
         id: "c8m1",
@@ -293,11 +305,13 @@ const BASE_CONVERSATIONS: Conversation[] = [
     id: "c9",
     personId: "p9",
     source: "x",
-    status: "done",
+    // Unimportant FYI (the gate errs exclusive): a nice link share lives in All.
+    status: "fyi",
+    important: false,
     urgency: "normal",
     unread: false,
     lastActivity: iso(600),
-    hermesSuggestion: "Shared a link you might find useful; no action needed.",
+    hermesSuggestion: "A link share, no ask — kept out of Important.",
     messages: [
       {
         id: "c9m1",
@@ -315,10 +329,92 @@ const BASE_CONVERSATIONS: Conversation[] = [
     },
   },
   {
+    id: "c11",
+    personId: "p10",
+    source: "linkedin",
+    // Important FYI: a portfolio founder's monthly investor update.
+    status: "fyi",
+    important: true,
+    urgency: "normal",
+    unread: true,
+    lastActivity: iso(200),
+    hermesSuggestion: "Portfolio update — worth knowing; no reply expected.",
+    messages: [
+      {
+        id: "c11m1",
+        authorId: "p10",
+        direction: "in",
+        timestamp: iso(200),
+        preview: "June update: MRR $48k (+19%), two enterprise pilots signed…",
+        body: "June update: MRR $48k (+19%), burn steady, 14 months runway. Two enterprise pilots signed and the self-serve funnel finally converts. Full letter is in your email — no need to reply here.",
+      },
+    ],
+    draft: {
+      status: "not_started",
+      modelLocality: "mock",
+      versions: [],
+    },
+  },
+  {
+    id: "c12",
+    personId: "p11",
+    source: "imessage",
+    // Important FYI: an intro lands tomorrow — context you need before it does.
+    status: "fyi",
+    important: true,
+    urgency: "medium",
+    unread: true,
+    lastActivity: iso(95),
+    hermesSuggestion: "You'll want this context before tomorrow's intro lands.",
+    messages: [
+      {
+        id: "c12m1",
+        authorId: "p11",
+        direction: "in",
+        timestamp: iso(95),
+        preview: "Heads up — intro'ing you to Maya Chen tomorrow morning.",
+        body: "Heads up — intro'ing you to Maya Chen (platform lead at Nimbus) tomorrow morning. She's read your sync write-up and is expecting your note. Nothing needed from you here.",
+      },
+    ],
+    draft: {
+      status: "not_started",
+      modelLocality: "mock",
+      versions: [],
+    },
+  },
+  {
+    id: "c13",
+    personId: "p12",
+    source: "x",
+    // Important FYI: a teammate's ship note — know it, nothing to do.
+    status: "fyi",
+    important: true,
+    urgency: "normal",
+    unread: true,
+    lastActivity: iso(55),
+    hermesSuggestion: "Ship note from your team — good to know, nothing to do.",
+    messages: [
+      {
+        id: "c13m1",
+        authorId: "p12",
+        direction: "in",
+        timestamp: iso(55),
+        preview: "Shipped the connector retry queue to prod tonight.",
+        body: "Shipped the connector retry queue to prod tonight. Error rate flat after two hours of soak — enabling it for everyone tomorrow.",
+      },
+    ],
+    draft: {
+      status: "not_started",
+      modelLocality: "mock",
+      versions: [],
+    },
+  },
+  {
     id: "c10",
     personId: "p3",
     source: "imessage",
     status: "done",
+    important: false,
     urgency: "normal",
     unread: false,
     lastActivity: iso(4300),
@@ -355,26 +451,37 @@ const BASE_CONVERSATIONS: Conversation[] = [
 const GEN_FIRST = ["Ava", "Noah", "Mia", "Leo", "Zoe", "Kai", "Ivy", "Eli", "Uma", "Rex", "Nia", "Jules", "Lia", "Omar", "Ada", "Ben", "Cleo", "Dev", "Esme", "Finn", "Gus", "Hana", "Iris", "Theo", "June", "Marek", "Sana", "Cole", "Rina", "Vic", "Lena", "Otis", "Pia", "Quinn", "Sol"];
 const GEN_LAST = ["Kim", "Silva", "Novak", "Reyes", "Moss", "Idris", "Park", "Lund", "Vega", "Osei", "Tanaka", "Baum", "Cruz", "Dorn", "Egan", "Frost", "Gill", "Haas", "Ito", "Joly"];
 const GEN_SOURCES: SourceId[] = ["imessage", "linkedin", "x"];
-// Weighted so Needs Reply reads as the workhorse view (v5); withDraft items get
+// Weighted so Important reads as the workhorse view (v6); withDraft items get
 // a ready Hermes draft, which chips + boosts them within their priority tier.
-const GEN_SPECS: { status: ThreadStatus; withDraft?: boolean }[] = [
-  { status: "needs_reply" },
-  { status: "needs_reply" },
-  { status: "needs_reply", withDraft: true },
-  { status: "sent" },
-  { status: "needs_reply" },
-  { status: "done" },
-  { status: "done" },
-  { status: "needs_reply" },
-  { status: "sent" },
-  { status: "done" },
+// `important` mirrors the triage policy: direct questions default INTO
+// Important (err inclusive); `social` needs-reply items carry no direct ask
+// and stay out; generated FYI errs exclusive and lives only in All.
+const GEN_SPECS: {
+  status: ThreadStatus;
+  important: boolean;
+  withDraft?: boolean;
+  social?: boolean;
+}[] = [
+  { status: "needs_reply", important: true },
+  { status: "fyi", important: false },
+  { status: "needs_reply", important: true, withDraft: true },
+  { status: "sent", important: true },
+  { status: "needs_reply", important: false, social: true },
+  { status: "done", important: false },
+  { status: "needs_reply", important: true },
+  { status: "fyi", important: false },
+  { status: "sent", important: true },
+  { status: "needs_reply", important: false, social: true },
+  { status: "needs_reply", important: true },
+  { status: "done", important: false },
 ];
 
-// Status-coherent content (v5): every snippet belongs to exactly ONE status's
-// semantics — a fixture must never plausibly straddle two.
+// Status-coherent content (v5, extended by v6): every snippet belongs to
+// exactly ONE status's semantics — a fixture must never plausibly straddle two.
 //   needs_reply = a direct question TO you (incoming; your court)
+//   fyi         = info to know, no reply expected (your attention is owed)
 //   sent        = YOUR last message asked for something (outgoing; open thread)
-//   done      = nobody's court — broadcast info or a closed confirmation
+//   done        = nothing owed — a closed confirmation
 // Needs-reply snippets carry their own THREAD-AWARE reply trios (warm =
 // relational open + soft commit · direct = answer first · brief = shortest
 // honest reply); sent snippets carry FOLLOW-UP trios (gentle nudge /
@@ -543,20 +650,34 @@ const DRAFTED_SNIPPETS = [
   "I owe you an intro to that designer I mentioned. Still interested?",
 ];
 
-// "done" = nobody's court: broadcast info + closed confirmations, merged (v5 —
-// FYI and Done are not views; these rows live only in All).
-const DONE_ITEMS: { body: string; suggestion: string }[] = [
-  { body: "Heads up: the API version you're on sunsets at the end of the month.", suggestion: "Informational; no reply expected." },
-  { body: "New build is up. The keyboard nav feels dramatically better.", suggestion: "Informational; no reply expected." },
-  { body: "FYI — moved our standup doc to the shared drive, same link structure.", suggestion: "Informational; no reply expected." },
-  { body: "Perfect, that answers it — thanks!", suggestion: "Resolved — nothing left to do." },
-  { body: "The panel got moved to the main hall, same start time.", suggestion: "Informational; no reply expected." },
-  { body: "All sorted on our end. Appreciate the quick turnaround.", suggestion: "Resolved — nothing left to do." },
-  { body: "Office is closed Monday for the holiday — plan around it.", suggestion: "Informational; no reply expected." },
-  { body: "Got it, see you there.", suggestion: "Resolved — nothing left to do." },
-  { body: "We renamed the shared channel; you're already in the new one.", suggestion: "Informational; no reply expected." },
-  { body: "Confirmed for Thursday — thanks again!", suggestion: "Resolved — nothing left to do." },
-  { body: "Payment received — receipt's in the system.", suggestion: "Resolved — nothing left to do." },
+// Social needs-reply (v6): no direct ask — a courtesy reply at most. The
+// triage gate keeps these OUT of Important; they demonstrate it in All.
+const SOCIAL_ITEMS: string[] = [
+  "Great running into you at the summit — we should catch up properly soon.",
+  "Your local-first post made the rounds in our team chat today. Good stuff.",
+  "Congrats on the launch — saw it everywhere this morning!",
+  "That restaurant rec was perfect, thanks again.",
+  "Just listened to the podcast episode — you were on form.",
+  "Happy Friday! Hope the sprint wrapped cleanly.",
+];
+
+// Unimportant FYI (v6, errs exclusive): minor broadcast info — lives in All.
+const FYI_ITEMS: string[] = [
+  "FYI — moved our standup doc to the shared drive, same link structure.",
+  "We renamed the shared channel; you're already in the new one.",
+  "The panel got moved to the main hall, same start time.",
+  "Office is closed Monday for the holiday — plan around it.",
+  "New build is up. The keyboard nav feels dramatically better.",
+];
+
+// "done" = closed confirmations: nothing owed, nobody's court (v6 split the
+// old merged pool — broadcast info is now status "fyi").
+const DONE_ITEMS: string[] = [
+  "Perfect, that answers it — thanks!",
+  "All sorted on our end. Appreciate the quick turnaround.",
+  "Got it, see you there.",
+  "Confirmed for Thursday — thanks again!",
+  "Payment received — receipt's in the system.",
 ];
 
 const GEN_DRAFT_TEXT =
@@ -578,7 +699,11 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
 
   const spec = GEN_SPECS[i % GEN_SPECS.length];
   const { status } = spec;
-  const counterKey = spec.withDraft ? "needs_reply_drafted" : status;
+  const counterKey = spec.withDraft
+    ? "needs_reply_drafted"
+    : spec.social
+      ? "needs_reply_social"
+      : status;
   const nth = (statusCounters[counterKey] = (statusCounters[counterKey] ?? 0) + 1);
 
   let body: string;
@@ -589,12 +714,17 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     suggestion = "You asked; nothing to do until they answer.";
     direction = "out"; // your message closed the turn; the thread is open on your side
   } else if (status === "done") {
-    const item = DONE_ITEMS[(nth - 1) % DONE_ITEMS.length];
-    body = item.body;
-    suggestion = item.suggestion;
+    body = DONE_ITEMS[(nth - 1) % DONE_ITEMS.length];
+    suggestion = "Resolved — nothing left to do.";
+  } else if (status === "fyi") {
+    body = FYI_ITEMS[(nth - 1) % FYI_ITEMS.length];
+    suggestion = "Minor info, no ask — kept out of Important.";
   } else if (spec.withDraft) {
     body = DRAFTED_SNIPPETS[(nth - 1) % DRAFTED_SNIPPETS.length];
     suggestion = "Draft ready for your review.";
+  } else if (spec.social) {
+    body = SOCIAL_ITEMS[(nth - 1) % SOCIAL_ITEMS.length];
+    suggestion = "Friendly note, no direct ask — kept out of Important; reply optional.";
   } else {
     body = NEEDS_ITEMS[(nth - 1) % NEEDS_ITEMS.length].body;
     suggestion = "Open question in the last message; a short reply keeps it moving.";
@@ -610,13 +740,16 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
     personId: pid,
     source,
     status,
+    important: spec.important,
+    // Urgency only where Hermes flagged importance — a high-priority dot on a
+    // kept-out-of-Important row would contradict the triage voice.
     urgency:
-      status === "needs_reply" && i % 9 === 0
+      status === "needs_reply" && spec.important && i % 9 === 0
         ? "high"
-        : status === "needs_reply" && i % 4 === 0
+        : status === "needs_reply" && spec.important && i % 4 === 0
           ? "medium"
           : "normal",
-    unread: (status === "needs_reply" && i % 3 === 0) || (status === "done" && i % 7 === 0),
+    unread: (status === "needs_reply" && i % 3 === 0) || (status === "fyi" && i % 7 === 0),
     lastActivity: iso(minAgo),
     hermesSuggestion: suggestion,
     messages: [

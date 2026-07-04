@@ -54,6 +54,8 @@ export function CommandPalette() {
   const setSortMode = useInboxStore((s) => s.setSortMode);
   const showDoneInSent = useInboxStore((s) => s.showDoneInSent);
   const toggleShowDone = useInboxStore((s) => s.toggleShowDone);
+  const fyiCollapsed = useInboxStore((s) => s.fyiCollapsed);
+  const toggleFyiCollapsed = useInboxStore((s) => s.toggleFyiCollapsed);
   const conversations = useInboxStore((s) => s.conversations);
   const setShortcuts = useInboxStore((s) => s.setShortcuts);
   const markDone = useInboxStore((s) => s.markDone);
@@ -201,10 +203,22 @@ export function CommandPalette() {
         icon: Check,
         run: withClose(() => toggleShowDone()),
       },
+      {
+        id: "important-fyi-fold",
+        label: fyiCollapsed ? "Important view: expand FYI" : "Important view: collapse FYI",
+        group: "Filter",
+        scope: "global",
+        icon: Filter,
+        run: withClose(() => toggleFyiCollapsed()),
+      },
       // Triage
       {
         id: "triage-done",
-        label: "Mark selected done",
+        // On an FYI thread `e` is an acknowledge — same transition, honest verb.
+        label:
+          selected?.status === "fyi"
+            ? "Acknowledge FYI (leaves Important, stays in All)"
+            : "Mark selected done",
         group: "Triage",
         scope: "selected",
         keys: "e",
@@ -300,7 +314,7 @@ export function CommandPalette() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
+  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, fyiCollapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleFyiCollapsed, markDone, snooze, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
     const order = ["Navigate", "Filter", "Triage", "Draft", "Dev"];

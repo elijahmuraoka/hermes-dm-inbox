@@ -1,6 +1,6 @@
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { VIEW_META, SOURCE_META, type SourceId, type ViewId } from "@/lib/types";
-import { isSnoozed } from "@/lib/derive";
+import { isImportant, isSnoozed } from "@/lib/derive";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Kbd } from "@/components/ui/kbd";
@@ -8,10 +8,10 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { HermesMark } from "@/components/HermesMark";
 import { Layers, Moon } from "lucide-react";
 
-// v5 final: three views, not five buckets. A view is a way of looking, not a
-// place things live — Needs Reply is home, Sent carries the open threads and
-// their time pressure, All is the trust anchor that omits nothing.
-const ORDER: ViewId[] = ["needs_reply", "sent", "all"];
+// v6: three views — Important is home (what matters now, gated by Hermes's
+// importance triage), Sent carries the open threads and their time pressure,
+// All is the trust anchor that omits nothing.
+const ORDER: ViewId[] = ["important", "sent", "all"];
 
 export function ViewNav() {
   const conversations = useInboxStore((s) => s.conversations);
@@ -20,14 +20,20 @@ export function ViewNav() {
   const filters = useInboxStore((s) => s.filters);
   const now = useInboxStore((s) => s.now);
 
-  const inSource = (c: (typeof conversations)[number]) =>
-    filters.source === "all" || c.source === filters.source;
+  type Conv = (typeof conversations)[number];
+  const inSource = (c: Conv) => filters.source === "all" || c.source === filters.source;
+  // The view's resting population (Important = gate-admitted; Sent = open
+  // threads; All = everything). Done-behind-toggle rows aren't counted.
+  const inView = (c: Conv, v: ViewId) =>
+    v === "all"
+      ? true
+      : v === "important"
+        ? isImportant(c, now)
+        : c.status === "sent" && !isSnoozed(c, now);
   const count = (v: ViewId) =>
-    conversations.filter(
-      (c) => inSource(c) && (v === "all" ? true : c.status === v && !isSnoozed(c, now)),
-    ).length;
+    conversations.filter((c) => inSource(c) && inView(c, v)).length;
   const unread = (v: ViewId) =>
-    conversations.filter((c) => c.unread && (v === "all" ? true : c.status === v)).length;
+    conversations.filter((c) => c.unread && inView(c, v)).length;
   const snoozedCount = conversations.filter((c) => isSnoozed(c, now)).length;
 
   return (

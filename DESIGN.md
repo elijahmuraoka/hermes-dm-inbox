@@ -93,7 +93,7 @@ Define once, both themes. Components reference these, never raw colors.
 
 | Token | Meaning | Dark | Light |
 |---|---|---|---|
-| `--view-needs-reply` | Needs Reply accent — home, the work | cyan `--primary` | blue `--primary` |
+| `--view-important` | Important accent — home, what matters now | cyan `--primary` | blue `--primary` |
 | `--view-sent`      | Sent — open threads, your side of the net | green | green |
 | `--view-all`       | All — the neutral ledger | slate/muted | slate/muted |
 | `--draft-ready`    | a Hermes draft awaits (row chip/dot) | soft violet-blue | soft violet-blue |
@@ -134,6 +134,24 @@ Define once, both themes. Components reference these, never raw colors.
 > one-quiet-line strip (Mark done / Reopen). Sent's accent moved OFF amber — amber stays
 > Hermes-presence-only (v4), which the medium-priority dot honors: priority is Hermes's triage voice.
 
+> **DECISION v6 — Elijah, 2026-07-04 (revises v5's home view).** Home is renamed **IMPORTANT** and
+> gains two SECTIONS, grouped like Sent's needs-follow-up/awaiting pattern (headers, not toggles):
+> **NEEDS REPLY** on top — ball-in-your-court items, priority-sorted exactly as v5's home (red tier →
+> draft-boost → oldest) — and **FYI** below, collapsible with an honest count — important info to
+> know, no reply expected. `e` on an FYI row **acknowledges** it: it leaves Important and lives on in
+> All (audited `triage.ack`). Priority dots order the FYI section too: urgency desc, then **newest**
+> first — info is not debt; fresh intel matters most, and acknowledging isn't answering, so the
+> oldest-unanswered rule stays a needs-reply rule. **The admission gate is importance** (Hermes
+> triage, human-correctable): unimportant items of BOTH kinds live only in All. **Triage policy:**
+> direct questions default INTO Important regardless of sender — err inclusive on needs-reply, a
+> missed real question costs more than skimming past noise; **FYI errs exclusive** — a section you
+> must sweep is only worth sweeping if everything in it matters. Rationale: v5's Needs Reply answered
+> "whose court is the ball in?" but never "does it matter?", so cold outreach ranked beside investor
+> questions and important context (an intro landing tomorrow, a teammate's ship note) had no home at
+> all. v5's harder call — FYI is not a VIEW — stands: this is not a resting place you visit, it's the
+> important slice of "know this" surfaced where you already look, and it drains via `e`. The rail
+> reads **Important / Sent / All**; `g i` goes home; the view subtitle is "What matters now".
+
 ---
 
 ## 4. Layout & density
@@ -143,7 +161,7 @@ Full target (3-pane) — Phase 0 may ship 2-col + modal palette (contract-approv
 ```
 ┌ topbar: search(/) · sync status · ⌘K ──────────────────────────────────┐
 ├ views/sources ───┬ conversation list ────────────┬ thread + Hermes draft ┤
-│ Needs Reply  ·N  │ [header: view · desc · filter  │ messages (all bodies  │
+│ Important    ·N  │ [header: view · desc · filter  │ messages (all bodies  │
 │ Sent         ·N  │  chips] [row: dot · src · name │  readable) …          │
 │ All          ·N  │  · priority · chips · preview  │ ── Hermes draft panel │
 │ ☾ Snoozed     N  │  · time — 1 line, 40px]        │  (lifecycle, studio)  │
@@ -156,15 +174,18 @@ Full target (3-pane) — Phase 0 may ship 2-col + modal palette (contract-approv
 - **Edge language:** the row's left edge carries selection — **cyan = where you are** (full-row wash +
   inset ring). (v4: the amber share tick is gone; amber now lives on Hermes surfaces, not rows.)
 - Left rail is quiet (Tomoji `--sidebar*`); the **list is the workhorse**, the thread/draft the focus.
-- **Default sort orders are SPEC (v5 — Elijah):** each view's order is the argument for its existence.
-  **Needs Reply sorts by leverage** — priority desc (Hermes triage), then draft-ready boost within the
-  tier (the fastest wins), then **oldest-unanswered**: it's a triage queue, and old debt must surface;
-  newest-first would bury exactly what's slipping. **Sent groups by obligation** — "Needs follow-up"
-  (≥3d quiet, stalest first: the longest silence is the one to chase) above "Awaiting" (fresh, newest
-  first), done hidden behind the toggle. **All sorts newest-first** — the familiar skim; its trust
-  comes from omitting nothing, not from cleverness. Sort **overrides** exist on every view
-  (⌘K-reachable: default / newest / oldest); an override flattens Sent's grouping, and a non-default
-  sort is always visibly chipped in the filter bar — the list never silently reorders.
+- **Default sort orders are SPEC (v5/v6 — Elijah):** each view's order is the argument for its existence.
+  **Important groups by what's owed (v6)** — the NEEDS REPLY section first, sorted by leverage:
+  priority desc (Hermes triage), then draft-ready boost within the tier (the fastest wins), then
+  **oldest-unanswered** — it's a triage queue, and old debt must surface; newest-first would bury
+  exactly what's slipping. The FYI section below: priority desc, then **newest** — info is not debt,
+  fresh intel first. **Sent groups by obligation** — "Needs follow-up" (≥3d quiet, stalest first: the
+  longest silence is the one to chase) above "Awaiting" (fresh, newest first), done hidden behind the
+  toggle. **All sorts newest-first** — the familiar skim; its trust comes from omitting nothing, not
+  from cleverness. Sort **overrides** exist on every view (⌘K-reachable: default / newest / oldest);
+  an override flattens the grouping in Sent AND Important (the FYI fold only exists while grouped —
+  hidden rows with no visible header would be a silent omission), and a non-default sort is always
+  visibly chipped in the filter bar — the list never silently reorders.
 - **No layout shift** while drafting/loading (contract perf rule) — reserve space; skeletons match final metrics.
 
 ---
@@ -179,18 +200,21 @@ Each ships with **all states** — default · hover · focus-visible · selected
    mono text tags) · fixed-width name (9.25rem) · **priority slot** (fixed width: red high · amber
    medium · empty normal; Hermes-computed, words in the tooltip; `p` cycles the tiers) · flex preview ·
    tabular time. Selection = full-row primary wash + inset ring (no avatar, no share ticks — v4).
-   **The row speaks the active view's language (v5):** Needs Reply shows a `Draft` chip when a Hermes
-   draft is ready (that's the leverage); Sent shows days-quiet (`4d`) and a `nudge · d` affordance once
-   stale (that's the time pressure); All shows a `snoozed` chip where honest (the skim omits nothing).
-   `j/k` moves selection, `Enter` opens.
+   **The row speaks the active view's language (v5/v6):** Important shows a `Draft` chip when a Hermes
+   draft is ready (that's the leverage) and an `ack · e` affordance on FYI rows (know it, clear it);
+   Sent shows days-quiet (`4d`) and a `nudge · d` affordance once stale (that's the time pressure);
+   All shows a `snoozed` chip where honest (the skim omits nothing). `j/k` moves selection, `Enter`
+   opens.
 2. **ViewNav** — the three views (one-line semantics `desc` under the list header) + sources with brand
    icons, live counts (tabular); active view uses `--primary` edge. A non-interactive **Snoozed count**
    sits under the views when > 0 (not a view — an honest tally of what's hidden). Lives in the **side
    rail from `md` up**; below `md` it's a **hamburger → left drawer** (no top chip bar at tablet widths
-   — Elijah's call). `g n` / `g s` / `g a` navigate the views. The list header also carries the
+   — Elijah's call). `g i` / `g s` / `g a` navigate the views. The list header also carries the
    **filter chip bar** (sources · unread · has-draft · active person · non-default sort) — filters and
    sort bite on every view, so they must be visible on every view. In Sent, a subtle **"Show done"
-   toggle** with an honest count sits at the top of the list.
+   toggle** with an honest count sits at the top of the list. In Important (v6), the two section
+   headers render even when a section is empty (each with a calm one-line empty state); the **FYI
+   header is the fold control** — chevron + honest count stay visible while its rows hide.
 3. **Thread** — message list; **every body is fully readable** (no blur, no reveal, no per-message or
    thread-level privacy chrome — v4). The Hermes strip carries only the triage rationale, with the HERMES
    label in presence amber.

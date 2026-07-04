@@ -41,10 +41,10 @@ export function useKeyboard() {
       if (isTyping(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // g-prefix combos — the three views (v5 final): g n / g s / g a
+      // g-prefix combos — the three views (v6): g i / g s / g a
       if (gPending.current) {
         clearG();
-        if (e.key === "n") return void st.setView("needs_reply");
+        if (e.key === "i") return void st.setView("important");
         if (e.key === "s") return void st.setView("sent");
         if (e.key === "a") return void st.setView("all");
       }

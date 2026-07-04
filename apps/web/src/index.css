@@ -46,7 +46,7 @@
      alone (v4), and a second amber meaning "open thread" would fork it. The
      MEDIUM-PRIORITY dot deliberately uses --hermes: priority is Hermes's
      triage voice — presence, not sharing. */
-  --view-needs-reply: oklch(0.55 0.15 235); /* cyan — home, the work */
+  --view-important: oklch(0.55 0.15 235); /* cyan — home, the work */
   --view-sent: oklch(0.6 0.14 150); /* green — your side of the net */
   --view-all: oklch(0.6 0.02 260); /* slate — the neutral ledger */
   --draft-ready: oklch(0.5 0.14 285); /* violet — a Hermes draft awaits */
@@ -92,7 +92,7 @@
   --sidebar-border: oklch(1 0 0 / 6%);
   --sidebar-ring: oklch(0.78 0.13 230 / 55%);
 
-  --view-needs-reply: oklch(0.78 0.13 230);
+  --view-important: oklch(0.78 0.13 230);
   --view-sent: oklch(0.72 0.15 152);
   --view-all: oklch(0.68 0.014 255);
   --draft-ready: oklch(0.72 0.12 288);
@@ -144,7 +144,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-view-needs-reply: var(--view-needs-reply);
+  --color-view-important: var(--view-important);
   --color-view-sent: var(--view-sent);
   --color-view-all: var(--view-all);
   --color-draft-ready: var(--draft-ready);

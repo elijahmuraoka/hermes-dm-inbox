@@ -46,6 +46,7 @@ interface InboxState {
   filters: InboxFilters;
   sortModes: Record<ViewId, SortMode>; // per-view sort override ("default" = specced order)
   showDoneInSent: boolean; // Sent's "Show done" toggle — done rows hide by default
+  fyiCollapsed: boolean; // Important's FYI section fold — header + honest count stay visible
   selectedId: string | null;
   mobilePane: "list" | "thread"; // active pane below the lg breakpoint
   draftSheetOpen: boolean; // bottom-sheet draft panel below xl — the hero loop must be visible everywhere
@@ -84,6 +85,7 @@ interface InboxState {
   clearFilters: () => void;
   setSortMode: (mode: SortMode) => void; // for the ACTIVE view
   toggleShowDone: () => void; // Sent only
+  toggleFyiCollapsed: () => void; // Important only — fold/unfold the FYI section
 
   // triage
   markDone: (id?: string) => void;
@@ -142,10 +144,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   loadState: "loading",
   conversations: CONVERSATIONS,
   audit: AUDIT_EVENTS,
-  activeView: "needs_reply",
+  activeView: "important",
   filters: NO_FILTERS,
   sortModes: { ...DEFAULT_SORTS },
   showDoneInSent: false,
+  fyiCollapsed: false,
   selectedId: null,
   mobilePane: "list",
   draftSheetOpen: false,
@@ -159,8 +162,17 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   studioFocusTick: 0,
 
   visibleConversations: () => {
-    const { conversations, activeView, filters, sortModes, showDoneInSent, now } = get();
-    return deriveVisible(conversations, activeView, filters, sortModes[activeView], showDoneInSent, now);
+    const { conversations, activeView, filters, sortModes, showDoneInSent, fyiCollapsed, now } =
+      get();
+    return deriveVisible(
+      conversations,
+      activeView,
+      filters,
+      sortModes[activeView],
+      showDoneInSent,
+      fyiCollapsed,
+      now,
+    );
   },
 
   selected: () => {
@@ -193,6 +205,14 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   toggleShowDone: () => {
     set((s) => ({ showDoneInSent: !s.showDoneInSent }));
     // Hiding done can orphan the selection; re-anchor only if it vanished.
+    const { visibleConversations, selectedId } = get();
+    const list = visibleConversations();
+    if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
+  },
+
+  // Folding FYI can orphan a selected FYI row — same re-anchor rule as above.
+  toggleFyiCollapsed: () => {
+    set((s) => ({ fyiCollapsed: !s.fyiCollapsed }));
     const { visibleConversations, selectedId } = get();
     const list = visibleConversations();
     if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
@@ -235,6 +255,10 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   markDone: (id) => {
     const target = id ?? get().selectedId;
     if (!target) return;
+    // On an FYI thread, `e` is an ACKNOWLEDGE (v6): same done transition —
+    // it leaves Important and lives on in All — but the audit trail keeps
+    // the distinction between clearing info and closing a conversation.
+    const isAck = get().conversations.find((c) => c.id === target)?.status === "fyi";
     // Serial triage: remember where we were so selection can ADVANCE to the
     // next row (Superhuman behavior) — yanking to the top made mid-list
     // triage unusable (pressure-test blocker #3).
@@ -247,7 +271,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       ),
       audit: pushAudit(
         s.audit,
-        { actor: "human", surface: "ui", action: "triage.done", resource: target, result: "allowed" },
+        {
+          actor: "human",
+          surface: "ui",
+          action: isAck ? "triage.ack" : "triage.done",
+          resource: target,
+          result: "allowed",
+        },
         s.now,
       ),
     }));

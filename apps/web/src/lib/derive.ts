@@ -1,7 +1,7 @@
 // The ONE derivation of "what rows does this view show" — shared by the store
 // getter and the list's useMemo so the two can never drift apart.
-// Default sort orders are SPEC (Elijah v5): each view's order is the argument
-// for its existence — see DESIGN.md §4. Overrides exist (⌘K), and a
+// Default sort orders are SPEC (Elijah v5/v6): each view's order is the
+// argument for its existence — see DESIGN.md §4. Overrides exist (⌘K), and a
 // non-default sort is always visibly chipped in the filter bar.
 import type { Conversation, SourceId, Urgency, ViewId } from "./types";
 import { STALE_DAYS } from "./types";
@@ -30,7 +30,7 @@ export function anyFilterActive(f: InboxFilters): boolean {
 /** Per-view sort override. "default" = the specced order. */
 export type SortMode = "default" | "newest" | "oldest";
 export const DEFAULT_SORTS: Record<ViewId, SortMode> = {
-  needs_reply: "default",
+  important: "default",
   sent: "default",
   all: "default",
 };
@@ -62,6 +62,26 @@ export function sentGroup(c: Conversation, now: number): "followup" | "awaiting"
   return isStale(c, now) ? "followup" : "awaiting";
 }
 
+/** Admission to the Important view (v6): importance is the gate, the ball's
+    court is only the section. Unimportant items of both kinds live in All. */
+export function isImportant(c: Conversation, now: number): boolean {
+  return (
+    c.important &&
+    !isSnoozed(c, now) &&
+    (c.status === "needs_reply" || c.status === "fyi")
+  );
+}
+
+/** An unacknowledged important-FYI thread — Important's second section. */
+export function isImportantFyi(c: Conversation, now: number): boolean {
+  return c.important && c.status === "fyi" && !isSnoozed(c, now);
+}
+
+/** Which Important section a row belongs to (drives the group headers). */
+export function importantGroup(c: Conversation): "needs_reply" | "fyi" {
+  return c.status === "fyi" ? "fyi" : "needs_reply";
+}
+
 const URGENCY_RANK: Record<Urgency, number> = { high: 0, medium: 1, normal: 2 };
 
 export function deriveVisible(
@@ -70,12 +90,21 @@ export function deriveVisible(
   filters: InboxFilters,
   sortMode: SortMode,
   showDoneInSent: boolean,
+  fyiCollapsed: boolean,
   now: number,
 ): Conversation[] {
   const inView = (c: Conversation) => {
     if (view === "all") return true;
     if (isSnoozed(c, now)) return false;
-    if (view === "needs_reply") return c.status === "needs_reply";
+    if (view === "important") {
+      if (!isImportant(c, now)) return false;
+      // Collapse hides the FYI SECTION — a grouped-display concept, so it
+      // only bites in the default (grouped) order. Under a flat override
+      // there is no section header to vouch for hidden rows, and rows with
+      // no visible header would silently disappear.
+      if (c.status === "fyi" && fyiCollapsed && sortMode === "default") return false;
+      return true;
+    }
     // Sent = open threads on your side of the net; done rides along only
     // behind the "Show done" toggle (and only if the last word was yours).
     return c.status === "sent" || (showDoneInSent && isSentDone(c));
@@ -97,15 +126,22 @@ export function deriveVisible(
     return list.sort(sortMode === "newest" ? newest : oldest);
   }
 
-  if (view === "needs_reply") {
-    // Priority desc → draft-ready boost within tier → oldest first. It's a
-    // triage queue: old debt surfaces; newest-first would bury what's slipping.
-    return list.sort(
-      (a, b) =>
-        URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency] ||
-        Number(hasDraft(b)) - Number(hasDraft(a)) ||
-        oldest(a, b),
-    );
+  if (view === "important") {
+    // Two sections (v6): NEEDS REPLY above FYI. Within needs-reply: priority
+    // desc → draft-ready boost within tier → oldest first — a triage queue;
+    // old debt surfaces. Within FYI: priority desc → newest first — info is
+    // not debt, fresh intel matters most, and acknowledging isn't answering.
+    const groupRank = { needs_reply: 0, fyi: 1 } as const;
+    return list.sort((a, b) => {
+      const ga = importantGroup(a);
+      const gb = importantGroup(b);
+      if (ga !== gb) return groupRank[ga] - groupRank[gb];
+      const byUrgency = URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency];
+      if (byUrgency) return byUrgency;
+      if (ga === "needs_reply")
+        return Number(hasDraft(b)) - Number(hasDraft(a)) || oldest(a, b);
+      return newest(a, b);
+    });
   }
   if (view === "sent") {
     // Needs follow-up (stalest first) → Awaiting (fresh, newest first) →

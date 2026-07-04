@@ -26,9 +26,9 @@ export function ListSkeleton() {
 }
 
 const EMPTY_COPY: Record<ViewId, { title: string; body: string }> = {
-  needs_reply: {
+  important: {
     title: "You're all caught up",
-    body: "Nothing is waiting on you right now. Enjoy the quiet.",
+    body: "Nothing important is waiting on you. Enjoy the quiet.",
   },
   sent: {
     title: "No open threads",

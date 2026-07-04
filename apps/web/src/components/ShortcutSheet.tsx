@@ -8,7 +8,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
       ["⌘K", "Command palette"],
       ["/", "Search"],
       ["?", "This help"],
-      ["g n", "Go to Needs Reply"],
+      ["g i", "Go to Important"],
       ["g s", "Go to Sent"],
       ["g a", "Go to All"],
     ],
@@ -24,7 +24,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Triage",
     rows: [
-      ["e", "Mark done (or Add to chat when a draft is picked)"],
+      ["e", "Mark done — acknowledges an FYI (Add to chat when a draft is picked)"],
       ["s", "Snooze (hidden until it returns)"],
       ["p", "Toggle priority"],
     ],

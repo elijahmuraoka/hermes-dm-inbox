@@ -19,15 +19,17 @@ interface RowProps {
 // (v4: the amber share tick is gone — consent theater collapsed. Amber is
 // Hermes's presence color, and the medium-priority dot qualifies: priority
 // IS Hermes's triage voice.)
-// v5 final: a fixed PRIORITY slot on every row (red high · amber medium ·
-// empty normal), then the active view's language — a Draft chip in Needs
-// Reply (leverage), staleness + a nudge affordance in Sent (time pressure),
-// and a snoozed chip in All (the skim omits nothing).
+// v5/v6: a fixed PRIORITY slot on every row (red high · amber medium ·
+// empty normal), then the active view's language — in Important, a Draft
+// chip (leverage) and an `ack · e` affordance on FYI rows (know it, clear
+// it); staleness + a nudge affordance in Sent (time pressure); a snoozed
+// chip in All (the skim omits nothing).
 function ConversationRowImpl({ conversation: c, view, selected, now, onClick }: RowProps) {
   const person = PEOPLE[c.personId];
   const lastMsg = c.messages[c.messages.length - 1];
   const drafted = hasDraft(c);
   const stale = view === "sent" && isStale(c, now);
+  const fyi = view === "important" && c.status === "fyi";
   const quietDays = daysSince(c.lastActivity, now);
 
   return (
@@ -79,7 +81,7 @@ function ConversationRowImpl({ conversation: c, view, selected, now, onClick }: 
         )}
       </span>
       {drafted &&
-        (view === "needs_reply" ? (
+        (view === "important" ? (
           <span
             className="shrink-0 rounded-[4px] border px-1 py-px text-[0.59375rem] font-medium uppercase tracking-wider"
             style={{
@@ -124,6 +126,16 @@ function ConversationRowImpl({ conversation: c, view, selected, now, onClick }: 
           title={`Quiet for ${quietDays} days — press d to draft a follow-up`}
         >
           nudge · d
+        </span>
+      )}
+      {/* Important's FYI section (v6): `e` acknowledges — the row leaves
+          Important and lives on in All. Mirrors Sent's nudge affordance. */}
+      {fyi && (
+        <span
+          className="shrink-0 rounded-[4px] border border-border bg-muted/40 px-1 py-px font-mono text-[0.59375rem] text-muted-foreground"
+          title="Info to know, no reply expected — press e to acknowledge (stays in All)"
+        >
+          ack · e
         </span>
       )}
       <span

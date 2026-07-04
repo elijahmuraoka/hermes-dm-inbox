@@ -48,7 +48,7 @@ export default function App() {
         return;
       }
       useInboxStore.setState({ loadState: "ready" });
-      setView("needs_reply");
+      setView("important");
     }, 650);
     return () => window.clearTimeout(t);
   }, [setView]);
