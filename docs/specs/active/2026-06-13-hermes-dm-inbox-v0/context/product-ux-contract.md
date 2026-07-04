@@ -17,6 +17,9 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 5. **Drafts are review objects.** Drafts need versions, status, evidence, and approval state.
 6. **Source differences are metadata, not separate apps.** iMessage/LinkedIn/X should feel unified while preserving source capabilities.
 7. **Speed over configurability in v0.** Avoid complex rules/settings until the loop is excellent.
+8. **Mouse parity, fast path, motion-causality (v7).** Every hotkey action has a visible hover
+   affordance; replying never requires a Hermes step (drafting is assistive, not modal); motion exists
+   only to explain a state change, and reduced motion kills all of it.
 
 ## Primary information architecture
 
@@ -115,6 +118,22 @@ Phase 0 can simplify to two columns plus modal command palette:
 
 ## Keyboard contract
 
+> **DECISION v7 — Elijah, 2026-07-04 (the feel pass).** "Still a little hard to use" was the unlabeled
+> cockpit and the ceremony, not the model — so keyboard-first gains a standing **mouse-parity rule**:
+> every action below also has a visible mouse path. Row hover fades the time into a quiet action
+> cluster (done/ack · draft/nudge · snooze; tooltips carry the keys); the thread header carries
+> done/snooze; every grouped section header is a fold control with an honest count (FYI's fold
+> persists, the rest are session-only; Sent's Done keeps the toggle as its one control); priority
+> cycles via `p` and a palette command; keys render as subtle keycaps ON their controls. **Fast path
+> first:** clicking the composer (or `c`) is just replying — zero Hermes steps; a ghost "Draft with
+> Hermes" button at the composer's right edge (amber wing) makes drafting discoverable from where
+> people already are, and yields once you type or a draft exists. The top three jobs — reply,
+> follow-up nudge, triage-to-zero — each take ≤2 decisions with zero prior knowledge.
+> **Motion-causality:** triaged/sent rows animate out (150ms exit-then-commit — the data flips when
+> the row is already gone; instant under reduced motion), counts tick, view switches cross-fade
+> (<120ms); nothing moves for decoration. **First-run affordance:** one dismissible hint line under
+> the topbar ("Press ? for shortcuts · j/k to move"), localStorage-dismissed — not a tour.
+
 Global:
 
 | Key | Action |
@@ -164,10 +183,10 @@ Drafting means Hermes reads the thread (see Privacy/sharing UX) — no share sig
 Command categories:
 
 - Navigate: Important, Sent, All, shortcuts
-- Filter: source, unread only, has draft, filter by person (sub-page), sort override, Sent show-done, Important FYI fold, clear filters
+- Filter: source, unread only, has draft, filter by person (sub-page), sort override, Sent show-done, section folds for the active view (v7), clear filters
 - Sync: sync all, sync source, connector health (Phase 1 — no fake commands before real sync)
 - Search: global search, source search
-- Triage: mark done (acknowledge on FYI), snooze
+- Triage: mark done (acknowledge on FYI), snooze, cycle priority (v7)
 - Draft: draft reply/follow-up, add draft to chat, focus composer, send
 - Tasks: create follow-up, show tasks, mark complete (Phase 1+)
 - Labels: add/remove label, saved filters (Phase 1+)
@@ -350,6 +369,9 @@ A public user can run the app with mock data and:
 7. see the post-send routing suggestion and flip it in one tap (v5)
 8. inspect audit events
 9. run matching `hdi` commands
+10. do all of it mouse-only OR keyboard-only (v7): the three jobs — reply, follow-up nudge,
+    triage-to-zero — complete either way with zero prior knowledge; rows animate out on triage/send
+    and counts tick (none of it under reduced motion); a first-run hint line shows until dismissed
 
 ## What not to over-design
 
