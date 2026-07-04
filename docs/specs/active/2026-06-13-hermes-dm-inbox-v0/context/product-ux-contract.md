@@ -24,7 +24,7 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 
 | Surface | Purpose |
 |---|---|
-| Inbox/Triage | process conversations by view (Needs Reply / Sent / All) |
+| Inbox/Triage | process conversations by view (Important / Sent / All) |
 | Thread | read selected conversation with privacy state |
 | Draft panel | ask Hermes, edit/regenerate/approve draft intent |
 | Command palette | execute all actions without leaving keyboard |
@@ -33,9 +33,25 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 | Audit/share log | inspect share-to-agent and other privacy-sensitive events |
 | Settings/connectors | source health, sync, connector setup guidance |
 
-### Core views (v5 — supersedes the five-bucket taxonomy)
+### Core views (v6 — Important is home; supersedes v5's Needs Reply home)
 
-> **DECISION v5 — Elijah, 2026-07-03 (naming final: NEEDS REPLY / SENT / ALL).** The five buckets
+> **DECISION v6 — Elijah, 2026-07-04 (revises v5's home view).** Home is renamed **IMPORTANT** and
+> gains two SECTIONS, grouped like Sent's needs-follow-up/awaiting pattern (headers, not toggles):
+> **NEEDS REPLY** on top (ball-in-your-court, priority-sorted exactly as v5's home) and **FYI** below
+> (collapsible, honest count) — important info to know, no reply expected; `e` **acknowledges** an FYI
+> row (it leaves Important, lives on in All; audited `triage.ack`). **The admission gate is
+> importance** (Hermes triage, human-correctable): unimportant items of BOTH kinds live only in All.
+>
+> **Triage policy (spec):** direct questions default INTO Important **regardless of sender** — err
+> inclusive on needs-reply; a missed real question costs more than skimming past noise. **FYI errs
+> exclusive** — a section you must sweep is only worth sweeping if everything in it matters.
+>
+> **Reasoning:** v5's Needs Reply answered "whose court is the ball in?" but never "does it matter?" —
+> cold outreach ranked beside investor questions, and important context (an intro landing tomorrow, a
+> teammate's ship note, a portfolio update) had no home at all. v5's harder call stands: FYI is NOT a
+> view — this is the important slice of "know this," surfaced where you already look, drained by `e`.
+
+> **DECISION v5 — Elijah, 2026-07-03 (kept for the trail; home view revised by v6).** The five buckets
 > (Needs Reply / Drafted / Waiting / FYI / Done) collapse to **three views**, and the parked
 > four-bucket proposal is superseded with them.
 >
@@ -46,23 +62,27 @@ It is not just a chronological feed. It is a triage and drafting cockpit.
 > names won** — Needs Reply and Sent are words every inbox user already owns; the one novel move is
 > Sent-as-open-threads, not the vocabulary.
 
-- **Needs Reply** — home/default. Everything waiting on you (reply OR action); absorbs the old Needs
-  Reply and Drafted. Every row carries a **priority slot** (red dot high / amber dot medium / empty
-  normal — Hermes-computed urgency, words in the tooltip; visible in All too). Threads with a ready
-  Hermes draft show a draft chip and boost within their priority tier.
+- **Important** — home/default; subtitle "What matters now". Two sections behind one importance gate:
+  **NEEDS REPLY** (everything waiting on you — reply or act; absorbs the old Needs Reply and Drafted;
+  threads with a ready Hermes draft show a draft chip and boost within their priority tier) above
+  **FYI** (important info to know, no reply expected — `e` acknowledges; the section header is the
+  fold control and its count stays honest while collapsed). Every row carries a **priority slot**
+  (red dot high / amber dot medium / empty normal — Hermes-computed urgency, words in the tooltip;
+  visible in All too). Each section shows a calm one-line empty state rather than vanishing.
 - **Sent** — open threads only by default, grouped: **"Needs follow-up"** (sent, no response, ≥ 3 days
   quiet) on top — `d` there drafts an angle-aware nudge (gentle nudge / direct ask / brief bump) — then
   **"Awaiting"** (fresh). Sent-and-done threads hide behind a subtle **"Show done"** toggle (honest
   count) at the top of the list; `e` on a sent thread marks it done and it leaves the default view.
   Sent = open-threads-on-my-side-of-the-net.
-- **All** — everything, newest first. The trust anchor and skim surface; no-action items live only
-  here (and behind Sent's toggle when the last word was yours).
+- **All** — everything, newest first. The trust anchor and skim surface; unimportant and acknowledged
+  items live only here (and behind Sent's toggle when the last word was yours).
 
-**Default sort orders are spec:** Needs Reply sorts by priority desc → draft-ready boost within tier →
-oldest first (a triage queue; old debt surfaces). Sent groups by obligation (needs-follow-up stalest
-first, then awaiting fresh). All sorts newest-first. **Sort controls** exist on every view
-(⌘K-reachable: default / newest / oldest); an override flattens Sent's grouping and is always visibly
-chipped.
+**Default sort orders are spec:** Important's needs-reply section sorts by priority desc → draft-ready
+boost within tier → oldest first (a triage queue; old debt surfaces); its FYI section by priority desc
+→ newest first (info is not debt — fresh intel first). Sent groups by obligation (needs-follow-up
+stalest first, then awaiting fresh). All sorts newest-first. **Sort controls** exist on every view
+(⌘K-reachable: default / newest / oldest); an override flattens the grouping in Sent and Important
+(the FYI fold only exists while grouped) and is always visibly chipped.
 
 **Filters** (source / person / unread / has-draft) apply on every view, render as a chip bar under the
 list header, and are ⌘K-reachable (person picking is a palette sub-page).
@@ -102,7 +122,7 @@ Global:
 | `Cmd+K` | command palette |
 | `?` | shortcut help |
 | `/` | search |
-| `g n` | Needs Reply |
+| `g i` | Important |
 | `g s` | Sent |
 | `g a` | All |
 
@@ -113,7 +133,7 @@ Conversation navigation:
 | `j/k` | move selection |
 | `Enter` | open thread |
 | `u` | back to list |
-| `e` | mark done/archive locally |
+| `e` | mark done/archive locally (acknowledges an FYI — leaves Important, stays in All) |
 | `s` | snooze/later |
 | `l` | label |
 | `p` | priority toggle |
@@ -143,11 +163,11 @@ Drafting means Hermes reads the thread (see Privacy/sharing UX) — no share sig
 
 Command categories:
 
-- Navigate: Needs Reply, Sent, All, shortcuts
-- Filter: source, unread only, has draft, filter by person (sub-page), sort override, Sent show-done, clear filters
+- Navigate: Important, Sent, All, shortcuts
+- Filter: source, unread only, has draft, filter by person (sub-page), sort override, Sent show-done, Important FYI fold, clear filters
 - Sync: sync all, sync source, connector health (Phase 1 — no fake commands before real sync)
 - Search: global search, source search
-- Triage: mark done, snooze
+- Triage: mark done (acknowledge on FYI), snooze
 - Draft: draft reply/follow-up, add draft to chat, focus composer, send
 - Tasks: create follow-up, show tasks, mark complete (Phase 1+)
 - Labels: add/remove label, saved filters (Phase 1+)
@@ -163,17 +183,20 @@ Rules:
 
 Human loop:
 
-1. Open Needs Reply (home).
-2. Move with `j/k` — the queue already leads with leverage (drafts, urgency, oldest debt).
+1. Open Important (home).
+2. Move with `j/k` — the needs-reply queue already leads with leverage (drafts, urgency, oldest debt).
 3. Use Hermes suggested label/priority.
 4. Press `d` to generate draft or `e` to mark done.
 5. Press `s` to snooze if no action now (hidden until it returns; counted in the rail).
-6. Sweep Sent for "Needs follow-up" threads; `d` there drafts a nudge.
-7. Correct Hermes classification when wrong (post-send routing has a one-tap flip).
+6. Sweep the FYI section; `e` acknowledges each item once seen (it drains into All).
+7. Sweep Sent for "Needs follow-up" threads; `d` there drafts a nudge.
+8. Correct Hermes classification when wrong (post-send routing has a one-tap flip; importance and
+   priority are human-correctable).
 
 Hermes should compute:
 
 - likely needs reply
+- importance (the Important view's admission gate — questions err inclusive, FYI errs exclusive)
 - urgency
 - relationship/source context
 - likely follow-up task
@@ -299,7 +322,7 @@ Must define now:
 - main layout
 - hotkeys
 - command palette categories
-- view model (Needs Reply / Sent / All) + sort orders
+- view model (Important / Sent / All) + sort orders + the importance gate
 - share-to-Hermes language
 - draft lifecycle
 - loading/empty/error states
@@ -318,7 +341,7 @@ Can defer:
 
 A public user can run the app with mock data and:
 
-1. see a fast inbox list (three views: Needs Reply / Sent / All)
+1. see a fast inbox list (three views: Important / Sent / All; Important = needs-reply + FYI sections)
 2. navigate with keyboard
 3. open a thread and read every message body
 4. see threads carry zero privacy chrome (v4 — the boundary is architectural)
