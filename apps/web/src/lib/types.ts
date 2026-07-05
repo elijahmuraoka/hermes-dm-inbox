@@ -56,7 +56,6 @@ export interface Message {
   timestamp: string; // ISO
   preview: string; // list snippet (first line of body); density, not redaction
   body: string; // always visible to the human — this is a single-user local app
-  mockSent?: boolean; // v0 composer send: local append only, never delivered
 }
 
 export interface DraftAngle {
@@ -82,7 +81,6 @@ export interface DraftChatMsg {
 
 export interface Draft {
   status: DraftStatus;
-  modelLocality: "mock" | "local" | "cloud";
   angles?: DraftAngle[]; // present while status === "angles_ready"
   versions: DraftVersion[];
   activeVersionId?: string;

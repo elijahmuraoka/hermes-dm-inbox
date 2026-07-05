@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Command } from "cmdk";
 import { useInboxStore } from "@/hooks/useInboxStore";
+import { FocusTrap } from "@/components/ui/focus-trap";
 import { VIEW_META, SOURCE_META, type SourceId, type ViewId } from "@/lib/types";
 import { anyFilterActive, type SectionKey } from "@/lib/derive";
 import { PEOPLE } from "@/lib/mock-data";
@@ -287,7 +288,12 @@ export function CommandPalette() {
         keys: "e",
         icon: FileText,
         run: withClose(() => addToChat()),
-        disabled: !selected || selected.draft.versions.length === 0,
+        // sent_mock: the draft is a receipt now — same guard as the studio
+        // button (review L2, duplicate-send hole).
+        disabled:
+          !selected ||
+          selected.draft.versions.length === 0 ||
+          selected.draft.status === "sent_mock",
       },
       {
         id: "composer-reply",
@@ -342,7 +348,8 @@ export function CommandPalette() {
       );
     }
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hand-maintained deps (no ESLint in this repo — review L14 dropped the
+    // inert disable-comment; add react-hooks lint before trusting edits here).
   }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, collapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleSection, markDone, snooze, togglePriority, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
@@ -362,7 +369,12 @@ export function CommandPalette() {
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 p-4 pt-[12vh] backdrop-blur-sm"
       onClick={close}
     >
-      <div
+      {/* M5: real dialog semantics + focus trap (cmdk autofocuses the input;
+          the trap keeps Tab inside and restores focus on close). */}
+      <FocusTrap
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="animate-scale-in w-full max-w-[35rem] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -451,7 +463,7 @@ export function CommandPalette() {
             )}
           </Command.List>
         </Command>
-      </div>
+      </FocusTrap>
     </div>
   );
 }

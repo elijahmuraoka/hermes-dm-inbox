@@ -27,6 +27,37 @@ export function anyFilterActive(f: InboxFilters): boolean {
   return f.source !== "all" || f.personId !== null || f.unreadOnly || f.hasDraftOnly;
 }
 
+/** The ONE filter lens — every surface that filters or counts uses this. */
+export function matchesFilters(c: Conversation, f: InboxFilters): boolean {
+  return (
+    (f.source === "all" || c.source === f.source) &&
+    (!f.personId || c.personId === f.personId) &&
+    (!f.unreadOnly || c.unread) &&
+    (!f.hasDraftOnly || hasDraft(c))
+  );
+}
+
+/** THE population count (review H2, F1's third recurrence): what a view
+    honestly holds under the CURRENT filters. Rail counts, the list-title
+    count, and Sent's done-toggle count all read this one lens so they can
+    never disagree. Folds are display-only (never counted out); Sent's
+    population is open threads only — done rows are accounted separately by
+    the toggle's own count (sentDoneCount). */
+export function population(
+  conversations: Conversation[],
+  view: ViewId,
+  filters: InboxFilters,
+  now: number,
+): Conversation[] {
+  return deriveVisible(conversations, view, filters, "default", false, null, now);
+}
+
+/** Sent's hidden-done tally, under the same filter lens as everything else —
+    "Show done (5)" must never reveal 1 row because a source chip was active. */
+export function sentDoneCount(conversations: Conversation[], filters: InboxFilters): number {
+  return conversations.filter((c) => isSentDone(c) && matchesFilters(c, filters)).length;
+}
+
 /** Per-view sort override. "default" = the specced order. */
 export type SortMode = "default" | "newest" | "oldest";
 export const DEFAULT_SORTS: Record<ViewId, SortMode> = {
@@ -82,11 +113,6 @@ export function isImportant(c: Conversation, now: number): boolean {
   );
 }
 
-/** An unacknowledged important-FYI thread — Important's second section. */
-export function isImportantFyi(c: Conversation, now: number): boolean {
-  return c.important && c.status === "fyi" && !isSnoozed(c, now);
-}
-
 /** Which Important section a row belongs to (drives the group headers). */
 export function importantGroup(c: Conversation): "needs_reply" | "fyi" {
   return c.status === "fyi" ? "fyi" : "needs_reply";
@@ -123,12 +149,7 @@ export function deriveVisible(
     const group = sentGroup(c, now);
     return group === "done" || !folded(`sent.${group}`);
   };
-  const matches = (c: Conversation) =>
-    inView(c) &&
-    (filters.source === "all" || c.source === filters.source) &&
-    (!filters.personId || c.personId === filters.personId) &&
-    (!filters.unreadOnly || c.unread) &&
-    (!filters.hasDraftOnly || hasDraft(c));
+  const matches = (c: Conversation) => inView(c) && matchesFilters(c, filters);
   const newest = (a: Conversation, b: Conversation) =>
     +new Date(b.lastActivity) - +new Date(a.lastActivity);
   const oldest = (a: Conversation, b: Conversation) => -newest(a, b);

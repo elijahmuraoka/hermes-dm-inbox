@@ -1,8 +1,18 @@
 import { useEffect, useRef } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
+import { XL_QUERY } from "@/lib/constants";
 
 // Keyboard is the product, not polish. Global handler with a small `g`-prefix
 // state machine. Ignores typing targets and defers ⌘K to the palette itself.
+//
+// DISPATCH PRIORITY (review M3/L3 — order is load-bearing):
+//   1. Escape — palette first, then typing scope owns it (inputs blur
+//      themselves; one press = one layer), then the overlay cascade.
+//   2. Palette open → it owns every key.
+//   3. Typing targets → no hotkeys.
+//   4. Pending `g` chord → consume the key WHATEVER it is (a failed chord
+//      must not fall through: `g e` archiving a thread was a live defect).
+//   5. Contextual keys (`e` respects the draft lifecycle) → plain hotkeys.
 export function useKeyboard() {
   const gPending = useRef(false);
   const gTimer = useRef<number | null>(null);
@@ -27,13 +37,16 @@ export function useKeyboard() {
 
       // Esc closes the TOPMOST overlay only — one press, one layer.
       if (e.key === "Escape") {
-        if (st.paletteOpen) st.setPalette(false);
-        else if (st.shortcutsOpen) st.setShortcuts(false);
+        if (st.paletteOpen) return void st.setPalette(false);
+        // M4: a focused input owns its own Esc (the textareas blur
+        // themselves) — never blur AND close the sheet underneath.
+        if (isTyping(e.target)) return;
+        if (st.shortcutsOpen) st.setShortcuts(false);
         else if (st.drawerOpen) st.setDrawer(false);
         // The sheet only exists below xl — at desktop the studio is the side
         // panel and the sheet state is dormant; Esc must never burn a press
         // on an invisible layer (pressure-test nit).
-        else if (st.draftSheetOpen && !window.matchMedia("(min-width: 1280px)").matches)
+        else if (st.draftSheetOpen && !window.matchMedia(XL_QUERY).matches)
           st.setDraftSheet(false);
         return;
       }
@@ -47,6 +60,7 @@ export function useKeyboard() {
         if (e.key === "i") return void st.setView("important");
         if (e.key === "s") return void st.setView("sent");
         if (e.key === "a") return void st.setView("all");
+        return; // L3: a failed chord swallows its key — `g e` must not archive
       }
 
       switch (e.key) {
@@ -80,15 +94,20 @@ export function useKeyboard() {
         case "?":
           e.preventDefault();
           return void st.setShortcuts(true);
-        case "e":
+        case "e": {
           // Contextual: with a picked draft on the card, e = Add to chat
           // (the primary draft action); otherwise e = mark done.
           // preventDefault ALWAYS: this hotkey can move focus into the
           // composer, and the keystroke must never type a literal "e" there.
           e.preventDefault();
-          if (st.selected()?.draft.status === "generated" || st.selected()?.draft.status === "iterated")
-            return void st.addToChat();
+          const ds = st.selected()?.draft.status;
+          if (ds === "generated" || ds === "iterated") return void st.addToChat();
+          // M3: a draft in flight makes `e` a no-op — one key-slip in the
+          // hero loop must never archive the thread and destroy the draft.
+          // Archiving a drafted thread needs its dedicated path (BACKLOG).
+          if (ds === "requested" || ds === "angles_ready") return;
           return void st.markDone();
+        }
         case "s":
           return void st.snooze();
         case "p":

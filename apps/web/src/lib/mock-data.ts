@@ -11,6 +11,7 @@ import type {
   ThreadStatus,
   Urgency,
 } from "./types";
+import { toPreview } from "./constants";
 
 export type AngleSet = Record<DraftAngleTone, string>;
 
@@ -81,7 +82,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -107,7 +107,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -133,7 +132,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -159,7 +157,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "generated",
-      modelLocality: "mock",
       activeVersionId: "c4d1",
       versions: [
         {
@@ -193,7 +190,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "iterated",
-      modelLocality: "mock",
       activeVersionId: "c5d2",
       versions: [
         {
@@ -237,7 +233,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -271,7 +266,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -298,7 +292,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -325,7 +318,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -352,7 +344,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -379,7 +370,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -406,7 +396,6 @@ const BASE_CONVERSATIONS: Conversation[] = [
     ],
     draft: {
       status: "not_started",
-      modelLocality: "mock",
       versions: [],
     },
   },
@@ -429,12 +418,10 @@ const BASE_CONVERSATIONS: Conversation[] = [
         timestamp: iso(4300),
         preview: "Perfect, see you then.",
         body: "Perfect, see you then.",
-        mockSent: true,
       },
     ],
     draft: {
       status: "sent_mock",
-      modelLocality: "mock",
       activeVersionId: "c10d1",
       versions: [
         {
@@ -721,6 +708,12 @@ const DONE_ITEMS: string[] = [
 const GEN_DRAFT_TEXT =
   "Thanks for the nudge — I looked through it this morning and it's in good shape. Let me confirm one detail on my end and I'll get you a proper answer by tomorrow.";
 
+/** Total lookup (review L7): real connector data will eventually reference a
+    sender the map doesn't know — render an honest unknown, never throw. */
+export function personFor(id: string): Person {
+  return PEOPLE[id] ?? { id, name: "Unknown sender", handle: id, initials: "?" };
+}
+
 const GENERATED_PEOPLE: Record<string, Person> = {};
 const statusCounters: Record<string, number> = {};
 const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
@@ -797,14 +790,13 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
         authorId: direction === "out" ? "me" : pid,
         direction,
         timestamp: iso(minAgo),
-        preview: body.length > 64 ? `${body.slice(0, 61)}…` : body,
+        preview: toPreview(body),
         body,
       },
     ],
     draft: spec.withDraft
       ? {
           status: "generated" as const,
-          modelLocality: "mock" as const,
           activeVersionId: `cg${i}d1`,
           versions: [
             {
@@ -817,7 +809,6 @@ const GENERATED: Conversation[] = Array.from({ length: 35 }, (_, i) => {
         }
       : {
           status: "not_started" as const,
-          modelLocality: "mock" as const,
           versions: [],
         },
   };

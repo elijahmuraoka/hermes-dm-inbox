@@ -34,31 +34,34 @@
 
   --sidebar: oklch(0.985 0.002 260);
   --sidebar-foreground: oklch(0.2 0.01 260);
-  --sidebar-primary: oklch(0.55 0.15 235);
+  /* Sibling accents DERIVE from --primary/--destructive (review H3): the AA
+     retune darkened --primary and left these at the old blue — two accents
+     is a broken scalpel. var() means the next retune moves everything. */
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.99 0.002 250);
   --sidebar-accent: oklch(0.95 0.012 235);
   --sidebar-accent-foreground: oklch(0.25 0.012 260);
   --sidebar-border: oklch(0.2 0.02 260 / 8%);
-  --sidebar-ring: oklch(0.55 0.15 235 / 45%);
+  --sidebar-ring: var(--ring);
 
   /* Inbox semantic tokens (v5 final: three views — Needs Reply / Sent / All —
      not five buckets). Sent moved OFF amber: amber belongs to Hermes presence
      alone (v4), and a second amber meaning "open thread" would fork it. The
      MEDIUM-PRIORITY dot deliberately uses --hermes: priority is Hermes's
      triage voice — presence, not sharing. */
-  --view-important: oklch(0.55 0.15 235); /* cyan — home, the work */
+  --view-important: var(--primary); /* home, the work — THE accent */
   --view-sent: oklch(0.6 0.14 150); /* green — your side of the net */
   --view-all: oklch(0.6 0.02 260); /* slate — the neutral ledger */
   --draft-ready: oklch(0.5 0.14 285); /* violet — a Hermes draft awaits */
   --status-ok: oklch(0.6 0.14 150);
-  --urgency-high: oklch(0.58 0.19 27);
-  --status-unread: oklch(0.55 0.15 235);
+  --urgency-high: var(--destructive); /* DESIGN §3: high priority IS destructive red */
+  --status-unread: var(--primary);
 
   /* Hermes's PRESENCE color (v4 reframe — amber marks Hermes surfaces, not
      "what Hermes sees"). L 0.48: AA for small text on near-white. */
   --hermes: oklch(0.48 0.15 60);
 
-  --glow-primary: oklch(0.55 0.15 235 / 22%);
+  --glow-primary: color-mix(in oklch, var(--primary) 22%, transparent);
 }
 
 /* ───────────────────────── Dark (primary, "operator") ───────────────────────── */
@@ -85,24 +88,25 @@
 
   --sidebar: oklch(0.17 0.012 260);
   --sidebar-foreground: oklch(0.9 0.006 250);
-  --sidebar-primary: oklch(0.78 0.13 230);
+  /* Sibling accents derive from the base tokens (review H3) — same rule as light. */
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.16 0.02 250);
   --sidebar-accent: oklch(0.3 0.02 250);
   --sidebar-accent-foreground: oklch(0.95 0.006 250);
   --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.78 0.13 230 / 55%);
+  --sidebar-ring: var(--ring);
 
-  --view-important: oklch(0.78 0.13 230);
+  --view-important: var(--primary);
   --view-sent: oklch(0.72 0.15 152);
   --view-all: oklch(0.68 0.014 255);
   --draft-ready: oklch(0.72 0.12 288);
   --status-ok: oklch(0.72 0.15 152);
-  --urgency-high: oklch(0.68 0.19 25);
-  --status-unread: oklch(0.78 0.13 230);
+  --urgency-high: var(--destructive); /* DESIGN §3: high priority IS destructive red */
+  --status-unread: var(--primary);
 
   --hermes: oklch(0.8 0.14 70); /* presence amber, AA on near-black */
 
-  --glow-primary: oklch(0.78 0.13 230 / 28%);
+  --glow-primary: color-mix(in oklch, var(--primary) 28%, transparent);
 }
 
 /* ───────────────────────── Map tokens → Tailwind utilities ───────────────────────── */
@@ -143,16 +147,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-
-  --color-view-important: var(--view-important);
-  --color-view-sent: var(--view-sent);
-  --color-view-all: var(--view-all);
-  --color-draft-ready: var(--draft-ready);
-  --color-status-ok: var(--status-ok);
-  --color-urgency-high: var(--urgency-high);
-  --color-status-unread: var(--status-unread);
-
-  --color-hermes: var(--hermes);
+  /* The inbox semantic tokens are consumed via style={{...var(--x)}} — no
+     component uses a Tailwind utility for them, so none are mapped here
+     (review L11: dead @theme utilities cut; re-add per token WITH a consumer). */
 }
 
 @layer base {
@@ -347,6 +344,8 @@
   }
 }
 .animate-row-exit {
+  /* 150ms is a FALLBACK — the row sets animationDuration inline from
+     EXIT_MS (lib/constants), which is the single source (review L12). */
   animation: row-exit 150ms var(--ease-house) forwards;
   overflow: hidden;
   pointer-events: none;

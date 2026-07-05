@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Conversation, Message } from "@/lib/types";
 import { SOURCE_META } from "@/lib/types";
-import { PEOPLE } from "@/lib/mock-data";
+import { personFor } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { cn, relTime } from "@/lib/utils";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -10,13 +10,16 @@ import { Check, ChevronLeft, Moon, Paperclip, SendHorizontal } from "lucide-reac
 import { HermesMark } from "@/components/HermesMark";
 
 export function Thread({ conversation: c }: { conversation: Conversation }) {
-  const person = PEOPLE[c.personId];
+  const person = personFor(c.personId);
   const now = useInboxStore((s) => s.now);
   const backToList = useInboxStore((s) => s.backToList);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
   const markDone = useInboxStore((s) => s.markDone);
   const snooze = useInboxStore((s) => s.snooze);
-  const hasDraft = c.draft.versions.length > 0 || c.draft.status === "angles_ready";
+  // "There is a draft surface to open" — deliberately broader than
+  // derive.hasDraft (unsent versions only); renamed so the two truth tables
+  // can't be confused (review L13).
+  const draftViewable = c.draft.versions.length > 0 || c.draft.status === "angles_ready";
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -87,7 +90,7 @@ export function Thread({ conversation: c }: { conversation: Conversation }) {
           className="ml-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-[0.75rem] font-medium text-foreground transition-colors hover:bg-primary/20 xl:hidden"
         >
           <HermesMark className="size-3.5 text-primary" strokeWidth={2.2} />
-          {hasDraft ? (
+          {draftViewable ? (
             "View draft"
           ) : (
             <>
@@ -294,7 +297,7 @@ function Composer({ conversation: c }: { conversation: Conversation }) {
 
 function MessageBubble({ message: m, now }: { message: Message; now: number }) {
   const mine = m.direction === "out";
-  const author = mine ? PEOPLE.me : PEOPLE[m.authorId];
+  const author = mine ? personFor("me") : personFor(m.authorId);
 
   return (
     <div className={cn("flex flex-col gap-1", mine ? "items-end" : "items-start")}>

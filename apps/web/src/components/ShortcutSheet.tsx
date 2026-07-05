@@ -1,5 +1,6 @@
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { Kbd } from "@/components/ui/kbd";
+import { FocusTrap } from "@/components/ui/focus-trap";
 
 const SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
@@ -56,8 +57,11 @@ export function ShortcutSheet() {
       aria-label="Keyboard shortcuts"
       aria-modal="true"
     >
-      <div
-        className="animate-scale-in w-full max-w-[35rem] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+      {/* M5: aria-modal means it — trap focus; tabIndex -1 lets the panel
+          itself take focus (this sheet has no focusable children). */}
+      <FocusTrap
+        tabIndex={-1}
+        className="animate-scale-in w-full max-w-[35rem] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -83,7 +87,7 @@ export function ShortcutSheet() {
             </div>
           ))}
         </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }

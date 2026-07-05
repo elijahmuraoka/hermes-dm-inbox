@@ -6,7 +6,8 @@ import {
   anyFilterActive,
   deriveVisible,
   importantGroup,
-  isSentDone,
+  population as derivePopulation,
+  sentDoneCount,
   sentGroup,
   type SectionKey,
 } from "@/lib/derive";
@@ -29,7 +30,6 @@ export function ConversationList() {
   const toggleSection = useInboxStore((s) => s.toggleSection);
   const exitingIds = useInboxStore((s) => s.exitingIds);
   const selectedId = useInboxStore((s) => s.selectedId);
-  const selectId = useInboxStore((s) => s.selectId);
   const retryLoad = useInboxStore((s) => s.retryLoad);
   const now = useInboxStore((s) => s.now);
 
@@ -41,19 +41,20 @@ export function ConversationList() {
       deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, collapsed, now),
     [conversations, activeView, filters, sortMode, showDoneInSent, collapsed, now],
   );
-  // The view's honest population under the CURRENT filters, folds ignored —
-  // the title count and every fold-header count must say exactly what's there
-  // (F1 rule, generalized in v7 to every section).
+  // THE population lens (review H2): same helper as the rail — title count,
+  // fold-header counts, and the rail can never disagree because they are one
+  // derivation (F1 rule; folds and the done-toggle never change population).
   const population = useMemo(
-    () => deriveVisible(conversations, activeView, filters, sortMode, showDoneInSent, null, now),
-    [conversations, activeView, filters, sortMode, showDoneInSent, now],
+    () => derivePopulation(conversations, activeView, filters, now),
+    [conversations, activeView, filters, now],
   );
   const filtered = anyFilterActive(filters);
 
-  // Sent's hidden-done population (for the honest toggle count).
+  // Sent's hidden-done tally — same filter lens as everything else (H2:
+  // "Show done (5)" must never reveal 1 row because a source chip is active).
   const doneCount = useMemo(
-    () => (activeView === "sent" ? conversations.filter(isSentDone).length : 0),
-    [conversations, activeView],
+    () => (activeView === "sent" ? sentDoneCount(conversations, filters) : 0),
+    [conversations, activeView, filters],
   );
 
   // Group headers only in the default order — an override flattens (v5/v6).
@@ -68,7 +69,6 @@ export function ConversationList() {
       selected={c.id === selectedId}
       exiting={exitingIds.includes(c.id)}
       now={now}
-      onClick={() => selectId(c.id)}
     />
   );
 
@@ -83,8 +83,9 @@ export function ConversationList() {
         <h2 className="flex items-center gap-2 text-[0.78125rem] font-semibold tracking-[-0.01em]">
           {VIEW_META[activeView].label}
           {/* An errored sync can't vouch for a count — show unknown, not stale.
-              Folds are display-only: folded rows stay in the view's population,
-              so the title count always agrees with the rail (F1). */}
+              The count is derive.population — the SAME call the rail makes
+              (H2), so the two surfaces cannot drift; folds and the done
+              toggle are display-only and never enter the number. */}
           <span className="tnum rounded-full bg-muted/70 px-1.5 py-px font-mono text-[0.65625rem] tabular-nums text-muted-foreground">
             {loadState === "error" ? "—" : <TickNum value={population.length} />}
           </span>
@@ -100,6 +101,8 @@ export function ConversationList() {
         {loadState === "loading" ? (
           <ListSkeleton />
         ) : loadState === "error" ? (
+          // The fixture error blames one hardcoded source (review L16) —
+          // Phase 1 wires the actually-failing connector's name (DESIGN §5.8).
           <ErrorState source="iMessage" onRetry={retryLoad} />
         ) : (
           <>
@@ -296,11 +299,14 @@ function SentSections({
   const countOf = (g: "followup" | "awaiting" | "done") =>
     population.filter((c) => sentGroup(c, now) === g).length;
 
-  if (population.length === 0) return <EmptyView view="sent" filtered={filtered} />;
-
   const followupCount = countOf("followup");
   const awaitingCount = countOf("awaiting");
   const doneRows = rowsOf("done");
+
+  // Population excludes done-behind-toggle (H2) — so only go view-empty when
+  // the toggle isn't currently showing done rows either.
+  if (population.length === 0 && doneRows.length === 0)
+    return <EmptyView view="sent" filtered={filtered} />;
 
   return (
     <>

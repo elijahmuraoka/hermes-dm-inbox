@@ -35,7 +35,7 @@ legible) before a slice is "done" — not an afterthought.
   --card:              oklch(0.20 0.014 260);
   --popover:           oklch(0.19 0.014 262);
   --muted:             oklch(0.26 0.012 260);
-  --muted-foreground:  oklch(0.68 0.014 255);
+  --muted-foreground:  oklch(0.74 0.016 255);    /* AA on near-black, incl. 10–11px */
   --border:            oklch(1 0 0 / 8%);        /* hairline via alpha, not a grey block */
   --input:             oklch(1 0 0 / 10%);
   --primary:           oklch(0.78 0.13 230);     /* signature cyan glow — the ONE accent */
@@ -54,16 +54,19 @@ legible) before a slice is "done" — not an afterthought.
   --foreground:        oklch(0.20 0.01 260);
   --card:              oklch(1 0 0);
   --muted:             oklch(0.97 0.003 260);
-  --muted-foreground:  oklch(0.52 0.012 260);
+  --muted-foreground:  oklch(0.44 0.014 262);    /* AA on near-white, incl. 10–11px */
   --border:            oklch(0.20 0.02 260 / 10%);
-  --primary:           oklch(0.55 0.15 235);     /* deeper blue-cyan — same family as dark */
-  --ring:              oklch(0.55 0.15 235 / 45%);
+  --primary:           oklch(0.48 0.16 245);     /* deep blue-cyan (AA retune) — same family as dark */
+  --ring:              oklch(0.48 0.16 245 / 50%);
 }
 ```
 
 Accent lives in the **blue-cyan family in both themes** (near Tomoji's blue `--primary`) so the two modes read
 as siblings. Use `--primary` **sparingly** — selection, focus, the active bucket, one live indicator. It is a
-scalpel, not a coat of paint.
+scalpel, not a coat of paint. **Sibling accent tokens DERIVE from the base pair** (review H3, 2026-07-04):
+`--view-important`, `--status-unread`, `--sidebar-primary`, `--sidebar-ring`, and `--glow-primary` are
+`var(--primary)`-based, and `--urgency-high` is `var(--destructive)`, in BOTH themes — an AA retune of the
+base token must move the whole family, never fork it.
 
 **Depth without slop:** separation comes from **layered surface tokens + hairline borders (alpha) + soft
 shadows**, never from heavy grey blocks or the AI-purple gradient. At most one faint ambient glow behind the
@@ -102,6 +105,10 @@ Define once, both themes. Components reference these, never raw colors.
 | `--status-unread` | unread dot/weight | `--primary` | `--primary` |
 | **Hermes presence ↓** | | | |
 | `--hermes` | amber — marks Hermes surfaces (mark chip, studio, HERMES label) AND the medium-priority dot: priority is Hermes's triage voice | oklch(0.8 0.14 70) | oklch(0.48 0.15 60) |
+
+> Where this table names a base token (`--primary`, `--destructive`), the CSS **must** define the
+> semantic token as `var()` of it — never a copied literal (review H3: copied literals forked the
+> accent when the base was retuned for AA).
 
 > **DECISION v4 — Elijah, 2026-07-03 (supersedes v2's sharing apparatus).** The consent theater is
 > collapsed: **no "Hermes sees this thread" chip, no Block/Allow switch, no share ticks, no body-policy

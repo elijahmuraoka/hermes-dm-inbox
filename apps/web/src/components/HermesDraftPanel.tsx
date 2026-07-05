@@ -172,7 +172,9 @@ export function HermesDraftPanel({
         </div>
       )}
 
-      {hasVersion && !anglesPending && <Studio conversation={c} />}
+      {/* key: the studio's typed instruction must die with a thread switch —
+          Enter after j/k iterated the WRONG thread's draft (review L1). */}
+      {hasVersion && !anglesPending && <Studio key={c.id} conversation={c} />}
     </aside>
   );
 }
@@ -371,12 +373,14 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
           </button>
         </div>
 
+        {/* Once sent, the button is a receipt, not a control — re-running
+            add-to-chat put a duplicate send one ⌘Enter away (review L2). */}
         <Button
           variant={sent ? "secondary" : "primary"}
           size="sm"
           className="w-full"
           onClick={addToChat}
-          disabled={drafting}
+          disabled={drafting || sent}
         >
           {sent ? <Check /> : <SendHorizontal />} {sent ? "Sent" : "Add to chat"}{" "}
           <Kbd

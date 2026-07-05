@@ -1,6 +1,6 @@
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { VIEW_META, SOURCE_META, type SourceId, type ViewId } from "@/lib/types";
-import { isImportant, isSnoozed } from "@/lib/derive";
+import { isSnoozed, population } from "@/lib/derive";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Kbd } from "@/components/ui/kbd";
@@ -22,22 +22,10 @@ export function ViewNav() {
   const filters = useInboxStore((s) => s.filters);
   const now = useInboxStore((s) => s.now);
 
-  type Conv = (typeof conversations)[number];
-  const inSource = (c: Conv) => filters.source === "all" || c.source === filters.source;
-  // The view's resting population (Important = gate-admitted; Sent = open
-  // threads; All = everything). Done-behind-toggle rows aren't counted.
-  const inView = (c: Conv, v: ViewId) =>
-    v === "all"
-      ? true
-      : v === "important"
-        ? isImportant(c, now)
-        : c.status === "sent" && !isSnoozed(c, now);
-  const count = (v: ViewId) =>
-    conversations.filter((c) => inSource(c) && inView(c, v)).length;
-  // Same lens as count() — an unread dot claiming rows the filtered view
-  // won't show would lie (pressure-test F3).
-  const unread = (v: ViewId) =>
-    conversations.filter((c) => c.unread && inSource(c) && inView(c, v)).length;
+  // THE population lens (review H2): the rail, the list title, and Sent's
+  // done toggle all count through derive.population under the full active
+  // filters — one lens, so the surfaces can never disagree (F1/F3 class).
+  const pop = (v: ViewId) => population(conversations, v, filters, now);
   const snoozedCount = conversations.filter((c) => isSnoozed(c, now)).length;
 
   return (
@@ -61,8 +49,9 @@ export function ViewNav() {
         </p>
         {ORDER.map((v) => {
           const active = v === activeView;
-          const n = count(v);
-          const u = unread(v);
+          const rows = pop(v);
+          const n = rows.length;
+          const u = rows.filter((c) => c.unread).length;
           return (
             <button
               key={v}

@@ -2,6 +2,24 @@
 
 Deferred items, with provenance. Phase 0 = mock UI slice; Phase 1 = first real backend/sync work.
 
+## Deferred from the 2026-07-04 PR #1 code review (report: docs/reviews/2026-07-04-214005-pr1-web-slice.md)
+
+Fix batch R1 took H1-H3, M1-M7, and the cheap Lows; these were explicitly deferred:
+
+- **M8 — extract the mock-Hermes brain to `lib/mock-hermes.ts`.** ~150 lines of pure logic
+  (suggestPostSend precedence, angle sets, applyInstruction's shorten-guard) untestable inside the
+  store hook. Deferred because it's refactor-only and lands best TOGETHER with the vitest seam below.
+- **L9 — CommandPalette wrapper split** (mount the body only while open). Perf-only at 48 fixtures;
+  the ~40-command rebuild per keystroke matters when real data lands, not before.
+- **L17 — render the audit trail.** pushAudit is annotated write-only-by-design in code; the surface
+  (per the ux-contract) is Phase-1 work alongside real share events worth inspecting.
+- **L18 — future-facing perf + CSP.** Row-exit via transform/FLIP at scale, epoch-ms sort keys,
+  audit-log cap, "don't use store getters in selectors" note, CSP meta + theme-script hash. All only
+  bite with real data volumes / real deployment posture — batched for the Phase-1 hardening pass.
+- **vitest seam.** Zero-config under Vite 6; first targets: deriveVisible + predicates (the whole view
+  contract, fixed clock), then mock-hermes once extracted (M8), then store transitions with a
+  matchMedia stub. Deferred so tests land against the post-M8 module layout, not before it.
+
 ## Polish — from the v7 feel pass (2026-07-04, non-blocking)
 
 - **Touch affordance for row actions.** The v7 hover cluster is hover-only; on touch devices the
@@ -61,8 +79,9 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
   archive-regardless-of-draft.
 - **Nit — connector settings surface** (contract): source health/last-sync/capabilities screen —
   not started in the slice.
-- **Nit — audit/share log surface** (`g a`): audit events are recorded in the store but there is no
-  UI to inspect them yet; `g a` currently opens the shortcut sheet as a stand-in.
+- **Nit — audit/share log surface**: audit events are recorded in the store but there is no UI to
+  inspect them yet. NOTE (review L15): `g a` is now bound to the All view (v6) — the audit surface
+  needs a different affordance when it lands (palette command or a new chord), not `g a`.
 
 ## Phase 1 — from Elijah's deploy review (2026-07-03)
 

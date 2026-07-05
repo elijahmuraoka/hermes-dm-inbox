@@ -25,6 +25,14 @@ import {
   type SectionKey,
   type SortMode,
 } from "@/lib/derive";
+import {
+  EXIT_MS,
+  MOCK_ANGLES_MS,
+  MOCK_ITERATE_MS,
+  MOCK_SYNC_MS,
+  XL_QUERY,
+  toPreview,
+} from "@/lib/constants";
 import type { AuditEvent } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "error";
@@ -52,6 +60,10 @@ interface InboxState {
   exitingIds: string[]; // v7 motion-causality: rows animating out before their mutation commits
   hintDismissed: boolean; // first-run hint bar under the topbar, gone once dismissed
   selectedId: string | null;
+  // Where the selection's row USED to sit when it left the view without a
+  // re-anchor (post-send keeps the thread open for the routing strip). The
+  // next j/k falls back here instead of yanking to row 0 (review M1).
+  orphanIdx: number | null;
   mobilePane: "list" | "thread"; // active pane below the lg breakpoint
   draftSheetOpen: boolean; // bottom-sheet draft panel below xl — the hero loop must be visible everywhere
   drawerOpen: boolean; // mobile (<md) hamburger drawer holding the view/source rail
@@ -143,15 +155,24 @@ function readHintDismissed(): boolean {
 }
 
 // Motion-causality (v7): a row that a mutation removes from the CURRENT view
-// animates out first (slide+fade+collapse, the list closes the gap), and the
-// data flips when the row is already gone. A row that stays visible (done in
-// All, send in Sent) commits instantly — motion only where state changes the
-// view. Reduced motion skips the delay entirely.
-const EXIT_MS = 150;
+// animates out first (slide+fade+collapse, the list closes the gap; EXIT_MS
+// from lib/constants), and the data flips when the row is already gone. A row
+// that stays visible (done in All, send in Sent) commits instantly — motion
+// only where state changes the view. Reduced motion skips the delay entirely.
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+// The draft sheet only exists below xl — at desktop the studio is the side
+// panel, and writing draftSheetOpen=true there leaves a stale flag that pops
+// the sheet uninvited when the window later narrows (review L5).
+function belowXl(): boolean {
+  return !window.matchMedia(XL_QUERY).matches;
+}
+
+// Write-only in v0 BY DESIGN (review L17): this is Phase-1 plumbing — the
+// contract's audit surface (`g a`) will render it; nothing in the slice
+// consumes it yet. Kept live so every action site already feeds the trail.
 function pushAudit(
   list: AuditEvent[],
   ev: Omit<AuditEvent, "id" | "timestamp">,
@@ -190,6 +211,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   exitingIds: [],
   hintDismissed: readHintDismissed(),
   selectedId: null,
+  orphanIdx: null,
   mobilePane: "list",
   draftSheetOpen: false,
   drawerOpen: false,
@@ -221,9 +243,16 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 
   setView: (v) => {
-    set({ activeView: v, mobilePane: "list", draftSheetOpen: false, drawerOpen: false }); // list-level action
-    const first = get().visibleConversations()[0] ?? null;
-    set({ selectedId: first?.id ?? null });
+    // exitingIds cleared: an in-flight exit predicted against the OLD view
+    // must not keep collapsing its row in the new one (review L4).
+    set({
+      activeView: v,
+      mobilePane: "list",
+      draftSheetOpen: false,
+      drawerOpen: false,
+      exitingIds: [],
+    });
+    reanchor(set, get, "top");
   },
 
   // Every filter mutation re-anchors selection on the first visible row —
@@ -238,16 +267,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   // Sort override for the active view; selection re-anchors like a filter.
   setSortMode: (mode) => {
     set((s) => ({ sortModes: { ...s.sortModes, [s.activeView]: mode } }));
-    const first = get().visibleConversations()[0] ?? null;
-    set({ selectedId: first?.id ?? null });
+    reanchor(set, get, "top");
   },
 
   toggleShowDone: () => {
     set((s) => ({ showDoneInSent: !s.showDoneInSent }));
     // Hiding done can orphan the selection; re-anchor only if it vanished.
-    const { visibleConversations, selectedId } = get();
-    const list = visibleConversations();
-    if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
+    reanchor(set, get, "keep");
   },
 
   // Folding a section can orphan a selected row — same re-anchor rule as above.
@@ -262,9 +288,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       }
     }
     set({ collapsed: next });
-    const { visibleConversations, selectedId } = get();
-    const list = visibleConversations();
-    if (!list.some((c) => c.id === selectedId)) set({ selectedId: list[0]?.id ?? null });
+    reanchor(set, get, "keep");
   },
 
   dismissHint: () => {
@@ -280,29 +304,39 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const list = get().visibleConversations();
     if (!list.length) return;
     const idx = list.findIndex((c) => c.id === get().selectedId);
-    const next = list[Math.min(idx + 1, list.length - 1)] ?? list[0];
+    // Orphaned selection (row left the view without a re-anchor, e.g.
+    // post-send): fall back to where the row used to sit, not row 0 (M1).
+    const at = idx === -1 ? clampIdx(get().orphanIdx ?? 0, list) : Math.min(idx + 1, list.length - 1);
+    const next = list[at];
     // Composer is per-thread: never let text bleed across conversations.
     if (next.id !== get().selectedId)
-      set({ selectedId: next.id, composerText: "", composerAttach: false });
+      set({ selectedId: next.id, orphanIdx: null, composerText: "", composerAttach: false });
   },
 
   selectPrev: () => {
     const list = get().visibleConversations();
     if (!list.length) return;
     const idx = list.findIndex((c) => c.id === get().selectedId);
-    const prev = list[Math.max(idx - 1, 0)] ?? list[0];
+    const at = idx === -1 ? clampIdx(get().orphanIdx ?? 0, list) : Math.max(idx - 1, 0);
+    const prev = list[at];
     if (prev.id !== get().selectedId)
-      set({ selectedId: prev.id, composerText: "", composerAttach: false });
+      set({ selectedId: prev.id, orphanIdx: null, composerText: "", composerAttach: false });
   },
 
   selectId: (id) =>
     set((s) => ({
       selectedId: id,
+      orphanIdx: null,
       mobilePane: "thread",
+      // M2: selecting a thread reads it (reference-inbox behavior). Only
+      // write conversations when something actually flips (M6 discipline).
+      conversations: readOne(s.conversations, id),
       ...(id !== s.selectedId ? { composerText: "", composerAttach: false } : {}),
     })),
   openThread: () => {
-    if (get().selectedId) set({ mobilePane: "thread" });
+    const id = get().selectedId;
+    if (!id) return;
+    set((s) => ({ mobilePane: "thread", conversations: readOne(s.conversations, id) }));
   },
   backToList: () => set({ mobilePane: "list", draftSheetOpen: false }),
   setPalette: (open) => set({ paletteOpen: open }),
@@ -380,11 +414,19 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   // Priority is Hermes-computed but human-correctable: p cycles the tiers.
   togglePriority: (id) => {
     const target = id ?? get().selectedId;
-    if (!target) return;
+    const conv = get().conversations.find((c) => c.id === target);
+    if (!target || !conv) return;
     const NEXT = { high: "medium", medium: "normal", normal: "high" } as const;
+    const next = NEXT[conv.urgency];
     set((s) => ({
       conversations: s.conversations.map((c) =>
-        c.id === target ? { ...c, urgency: NEXT[c.urgency] } : c,
+        c.id === target ? { ...c, urgency: next } : c,
+      ),
+      // L10: the one human triage correction that skipped the audit trail.
+      audit: pushAudit(
+        s.audit,
+        { actor: "human", surface: "ui", action: `triage.priority.${next}`, resource: target, result: "allowed" },
+        s.now,
       ),
     }));
   },
@@ -411,13 +453,21 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // Same guard as done/snooze: a row mid-exit is already leaving — don't
     // start drafting on it in the commit window.
     if (!conv || get().exitingIds.includes(conv.id)) return;
+    // M7: no re-request while a draft is in flight or already handed to the
+    // composer — double-`d` scheduled duplicate timers, and re-drafting over
+    // added_to_chat/edited silently broke divergence + send attribution.
+    // (generated/iterated MAY re-draft: fresh angles over a card you haven't
+    // committed to is a legitimate move.)
+    const ds = conv.draft.status;
+    if (ds === "requested" || ds === "angles_ready" || ds === "added_to_chat" || ds === "edited")
+      return;
     // Drafting means Hermes reads the thread — full stop, no badges, no
     // switches (Elijah v4). lifecycle: requested → angles_ready → pick 1/2/3.
     // Open the sheet too: below xl the side panel doesn't exist, and a state
     // mutation with no visible feedback is a contract violation.
     set((s) => ({
       draftingId: conv.id,
-      draftSheetOpen: true,
+      draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) =>
         c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
       ),
@@ -435,12 +485,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         draftingId: s.draftingId === conv.id ? null : s.draftingId,
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
-          const set = anglesFor(c);
+          const angleSet = anglesFor(c); // (was `set` — shadowed the store setter, review L13)
           // Three angled candidates, picked by number key. On a sent (open)
           // thread these are FOLLOW-UPS (gentle nudge / direct ask / brief
           // bump) — chasing, not answering.
           const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
-            (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: set[tone] }),
+            (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: angleSet[tone] }),
           );
           return { ...c, draft: { ...c.draft, status: "angles_ready", angles } };
         }),
@@ -450,7 +500,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       }));
-    }, 620);
+    }, MOCK_ANGLES_MS);
   },
 
   chooseAngle: (n) => {
@@ -459,7 +509,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const angle = conv.draft.angles[n - 1];
     if (!angle) return;
     set((s) => ({
-      draftSheetOpen: true,
+      draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) => {
         if (c.id !== conv.id) return c;
         const vid = `${c.id}d${c.draft.versions.length + 1}`;
@@ -502,7 +552,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // N2 class: every draft mutation opens its feedback surface (sheet <xl).
     set((s) => ({
       draftingId: conv.id,
-      draftSheetOpen: true,
+      draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) =>
         c.id === conv.id
           ? { ...c, draft: { ...c.draft, chat: [...(c.draft.chat ?? []), userMsg] } }
@@ -542,7 +592,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       }));
-    }, 520);
+    }, MOCK_ITERATE_MS);
   },
 
   // `r`: focus the studio chat input — refinement always carries intent
@@ -551,7 +601,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     if (!conv || conv.draft.versions.length === 0) return;
     set((s) => ({
-      draftSheetOpen: true, // below xl the studio lives in the sheet
+      draftSheetOpen: belowXl() ? true : s.draftSheetOpen, // the studio's sheet only exists below xl
       mobilePane: "thread",
       studioFocusTick: s.studioFocusTick + 1,
     }));
@@ -594,11 +644,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     const active = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     // Hermes-originated prefill that diverges from the draft → status "edited".
+    // M6: flip exactly ONCE, on the added_to_chat → edited transition —
+    // rewriting the conversations array per keystroke was a render storm.
+    // "edited" never flips back: send attribution only needs "did it diverge".
     const diverged =
-      conv &&
-      active &&
-      (conv.draft.status === "added_to_chat" || conv.draft.status === "edited") &&
-      text !== active.text;
+      conv && active && conv.draft.status === "added_to_chat" && text !== active.text;
     set((s) => ({
       composerText: text,
       conversations: diverged
@@ -650,6 +700,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       conv.draft.status === "added_to_chat" ||
       (conv.draft.status === "edited" && !!active);
     const routed = suggestPostSend(text);
+    // M1: remember where the row sat — post-send the selection deliberately
+    // stays on this thread (routing strip), so when the row leaves the view
+    // the next j/k must fall back to its old slot, not row 0.
+    const beforeIdx = get()
+      .visibleConversations()
+      .findIndex((c) => c.id === conv.id);
     // The composer clears the instant you send — that's the send being felt.
     // Only the data flip waits for the row's exit animation (Important only;
     // in Sent/All the row stays visible and everything commits at once).
@@ -659,7 +715,8 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         ? { ...c, status: "sent" as const, unread: false, lastActivity: new Date(get().now).toISOString() }
         : c,
     );
-    exitThenCommit(set, get, conv.id, predicted, () => set((s) => {
+    exitThenCommit(set, get, conv.id, predicted, () => {
+      set((s) => {
       const nowIso = new Date(s.now).toISOString();
       return {
         conversations: s.conversations.map((c) => {
@@ -678,9 +735,8 @@ export const useInboxStore = create<InboxState>((set, get) => ({
                 authorId: "me",
                 direction: "out" as const,
                 timestamp: nowIso,
-                preview: text.length > 64 ? `${text.slice(0, 61)}…` : text,
+                preview: toPreview(text),
                 body: text,
-                mockSent: true,
               },
             ],
             draft: fromHermes ? { ...c.draft, status: "sent_mock" as const } : c.draft,
@@ -702,7 +758,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       };
-    }));
+      });
+      // Post-commit truth: the selection stays on this thread for the routing
+      // strip, but if its row left the view, j/k needs the old slot (M1).
+      if (beforeIdx !== -1 && !get().visibleConversations().some((c) => c.id === conv.id))
+        set({ orphanIdx: beforeIdx });
+    });
   },
 
   // Recoverable by design: retry runs a fresh mock sync and restores the fixtures.
@@ -711,7 +772,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     window.setTimeout(() => {
       set({ loadState: "ready", conversations: CONVERSATIONS });
       get().setView(get().activeView);
-    }, 650);
+    }, MOCK_SYNC_MS);
   },
 
   demoState: (mode) => {
@@ -723,15 +784,53 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 }));
 
+function clampIdx(idx: number, list: Conversation[]): number {
+  return Math.min(Math.max(idx, 0), list.length - 1);
+}
+
+/** Mark one conversation read; returns the SAME array when nothing flips so
+    no-op selections never churn identity (M2 + M6 discipline). */
+function readOne(conversations: Conversation[], id: string | null): Conversation[] {
+  if (!id || !conversations.some((c) => c.id === id && c.unread)) return conversations;
+  return conversations.map((c) => (c.id === id ? { ...c, unread: false } : c));
+}
+
+// THE re-anchor path (review H1): every view/filter/sort/fold change that can
+// move selectedId funnels here, and a selection move ALWAYS clears the
+// composer — typed text must never bleed into another conversation (the same
+// invariant j/k/selectId enforce). "top" jumps to the first visible row (a
+// new lens starts at the top); "keep" holds a still-visible selection and
+// falls back to the first row only when orphaned (display folds/toggles).
+function reanchor(
+  set: (partial: Partial<InboxState>) => void,
+  get: () => InboxState,
+  mode: "top" | "keep",
+) {
+  const list = get().visibleConversations();
+  const prev = get().selectedId;
+  const next =
+    mode === "keep" && list.some((c) => c.id === prev) ? prev : (list[0]?.id ?? null);
+  set({
+    selectedId: next,
+    orphanIdx: null,
+    ...(next !== prev ? { composerText: "", composerAttach: false } : {}),
+  });
+}
+
 // Shared by every filter setter: merge the patch, then re-anchor selection.
 function applyFilters(
   set: (partial: Partial<InboxState>) => void,
   get: () => InboxState,
   patch: Partial<InboxFilters>,
 ) {
-  set({ filters: { ...get().filters, ...patch }, mobilePane: "list", drawerOpen: false });
-  const first = get().visibleConversations()[0] ?? null;
-  set({ selectedId: first?.id ?? null });
+  // exitingIds cleared for the same reason as setView (review L4).
+  set({
+    filters: { ...get().filters, ...patch },
+    mobilePane: "list",
+    drawerOpen: false,
+    exitingIds: [],
+  });
+  reanchor(set, get, "top");
 }
 
 // v7 motion-causality core: predict (against the mutated copy) whether the
@@ -780,9 +879,9 @@ function advanceSelection(
 ) {
   const after = get().visibleConversations();
   if (after.some((c) => c.id === get().selectedId)) return;
-  const next = after[Math.min(Math.max(beforeIdx, 0), after.length - 1)] ?? null;
+  const next = after[clampIdx(beforeIdx, after)] ?? null;
   // Composer is per-thread: a selection move clears it, same as j/k.
-  set({ selectedId: next?.id ?? null, composerText: "", composerAttach: false });
+  set({ selectedId: next?.id ?? null, orphanIdx: null, composerText: "", composerAttach: false });
 }
 
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────

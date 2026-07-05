@@ -1,9 +1,10 @@
 import { memo } from "react";
 import type { Conversation, ViewId } from "@/lib/types";
 import { SOURCE_META } from "@/lib/types";
-import { PEOPLE } from "@/lib/mock-data";
+import { personFor } from "@/lib/mock-data";
 import { useInboxStore } from "@/hooks/useInboxStore";
 import { hasDraft, isSnoozed, isStale } from "@/lib/derive";
+import { EXIT_MS } from "@/lib/constants";
 import { cn, daysSince, relTime } from "@/lib/utils";
 import { SourceIcon } from "@/components/SourceIcon";
 import { HermesMark } from "@/components/HermesMark";
@@ -15,7 +16,6 @@ interface RowProps {
   selected: boolean;
   exiting: boolean;
   now: number;
-  onClick: () => void;
 }
 
 // LOCKED (§8 variant bake-off, Elijah 2026-07-03): the "ledger" treatment.
@@ -35,8 +35,8 @@ interface RowProps {
 // The cluster is tabIndex -1 — the keyboard path is e/d/s, not forty tab
 // stops. v7 motion: `exiting` plays the leave animation while the mutation
 // waits (store exitThenCommit); the collapsing height closes the gap.
-function ConversationRowImpl({ conversation: c, view, selected, exiting, now, onClick }: RowProps) {
-  const person = PEOPLE[c.personId];
+function ConversationRowImpl({ conversation: c, view, selected, exiting, now }: RowProps) {
+  const person = personFor(c.personId);
   const lastMsg = c.messages[c.messages.length - 1];
   const drafted = hasDraft(c);
   const stale = view === "sent" && isStale(c, now);
@@ -66,10 +66,15 @@ function ConversationRowImpl({ conversation: c, view, selected, exiting, now, on
           : "hover:bg-accent/25",
         exiting && "animate-row-exit",
       )}
+      // TS EXIT_MS is the single source of the exit length; the CSS keyframe
+      // duration is only a fallback (review L12).
+      style={exiting ? { animationDuration: `${EXIT_MS}ms` } : undefined}
     >
+      {/* Static dispatch keeps the memo load-bearing (review L8): an inline
+          closure prop from the list defeated it on every parent render. */}
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => useInboxStore.getState().selectId(c.id)}
         aria-current={selected ? "true" : undefined}
         className="flex h-10 w-full items-center gap-2.5 pl-3 pr-4 text-left"
       >

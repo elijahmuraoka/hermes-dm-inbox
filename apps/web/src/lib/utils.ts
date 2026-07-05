@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Whole days since the timestamp — staleness math for the Waiting view. */
+/** Whole days since the timestamp — staleness math for Sent's follow-up rule. */
 export function daysSince(iso: string, now: number): number {
   return Math.floor((now - new Date(iso).getTime()) / 86_400_000);
 }

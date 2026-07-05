@@ -10,6 +10,8 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutSheet } from "@/components/ShortcutSheet";
 import { NoSelection } from "@/components/StatusStates";
 import { Kbd } from "@/components/ui/kbd";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { XL_QUERY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -17,9 +19,9 @@ import { X } from "lucide-react";
     CSS-hiding kept the losing surface mounted — duplicate DOM for probes and
     a dead Esc at desktop. JS unmounts it instead. */
 function useIsXl() {
-  const [xl, setXl] = useState(() => window.matchMedia("(min-width: 1280px)").matches);
+  const [xl, setXl] = useState(() => window.matchMedia(XL_QUERY).matches);
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
+    const mq = window.matchMedia(XL_QUERY);
     const onChange = (e: MediaQueryListEvent) => setXl(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -42,9 +44,12 @@ export default function App() {
 
   // Mock initial sync → ready, then select the first row (shows skeletons briefly).
   // Dev/demo: ?state=empty and ?state=error land on those states instead, so the
-  // empty/error UI can be render-verified without editing fixtures.
+  // empty/error UI can be render-verified without editing fixtures. DEV-gated
+  // (review L6) — a deployed URL must not be state-spoofable.
   useEffect(() => {
-    const demo = new URLSearchParams(window.location.search).get("state");
+    const demo = import.meta.env.DEV
+      ? new URLSearchParams(window.location.search).get("state")
+      : null;
     const t = window.setTimeout(() => {
       if (demo === "empty" || demo === "error") {
         useInboxStore.getState().demoState(demo);
@@ -162,41 +167,10 @@ function HintBar() {
 }
 
 /** aria-modal must mean it: focus moves in on open, Tab is trapped, focus
-    restores to the opener on close. */
+    restores to the opener on close — via the shared useFocusTrap (M5). */
 function MobileDrawer({ onClose }: { onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    const focusables = () =>
-      Array.from(
-        panel?.querySelectorAll<HTMLElement>(
-          'button, [href], input, [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
-    focusables()[0]?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
-      const els = focusables();
-      if (!els.length) return;
-      const first = els[0];
-      const last = els[els.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    panel?.addEventListener("keydown", onKey);
-    return () => {
-      panel?.removeEventListener("keydown", onKey);
-      opener?.focus();
-    };
-  }, []);
+  useFocusTrap(panelRef);
 
   return (
     <div
