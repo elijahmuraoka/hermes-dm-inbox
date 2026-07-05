@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   Conversation,
+  Draft,
   DraftAngle,
   DraftAngleTone,
   DraftChatMsg,
@@ -184,6 +185,22 @@ function pushAudit(
   ];
 }
 
+// R4 family: marking a thread done cancels an in-flight draft request —
+// pending angles must not land on an archived thread (the async flip guard
+// then drops them, since status is no longer "requested"/"angles_ready").
+// Versions already produced stay — they're real work — and the draft rests
+// at the state those versions imply. Snooze deliberately does NOT cancel:
+// "later" should come back to finished angles.
+function cancelPendingDraft(d: Draft): Draft {
+  if (d.status !== "requested" && d.status !== "angles_ready") return d;
+  return {
+    ...d,
+    angles: undefined,
+    status:
+      d.versions.length > 1 ? "iterated" : d.versions.length === 1 ? "generated" : "not_started",
+  };
+}
+
 // Post-send suggestion (v5 final): sending always lands the thread in Sent
 // (open) — Hermes only SUGGESTS done-vs-open. Asks win when both appear
 // ("Thanks! Can you…?" stays open).
@@ -365,7 +382,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     exitThenCommit(set, get, target, predicted, () => {
       set((s) => ({
         conversations: s.conversations.map((c) =>
-          c.id === target ? { ...c, status: "done" as const, unread: false } : c,
+          c.id === target
+            ? { ...c, status: "done" as const, unread: false, draft: cancelPendingDraft(c.draft) }
+            : c,
         ),
         audit: pushAudit(
           s.audit,
@@ -479,27 +498,36 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
 
     window.setTimeout(() => {
-      set((s) => ({
+      set((s) => {
         // Clear only OUR generation marker — a draft started on another
         // thread in the meantime keeps its own spinner.
-        draftingId: s.draftingId === conv.id ? null : s.draftingId,
-        conversations: s.conversations.map((c) => {
-          if (c.id !== conv.id) return c;
-          const angleSet = anglesFor(c); // (was `set` — shadowed the store setter, review L13)
-          // Three angled candidates, picked by number key. On a sent (open)
-          // thread these are FOLLOW-UPS (gentle nudge / direct ask / brief
-          // bump) — chasing, not answering.
-          const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
-            (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: angleSet[tone] }),
-          );
-          return { ...c, draft: { ...c.draft, status: "angles_ready", angles } };
-        }),
-        audit: pushAudit(
-          s.audit,
-          { actor: "hermes", surface: "ui", action: "draft.angles", resource: conv.id, result: "allowed" },
-          s.now,
-        ),
-      }));
+        const clearSpin = { draftingId: s.draftingId === conv.id ? null : s.draftingId };
+        // R4-2: the async flip is only valid while the request still stands.
+        // A send (draft terminalized), done (request canceled), or any other
+        // status move during the window means these angles answer a moment
+        // that no longer exists — drop them; the spinner clears either way.
+        const cur = s.conversations.find((x) => x.id === conv.id);
+        if (cur?.draft.status !== "requested") return clearSpin;
+        return {
+          ...clearSpin,
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conv.id) return c;
+            const angleSet = anglesFor(c); // (was `set` — shadowed the store setter, review L13)
+            // Three angled candidates, picked by number key. On a sent (open)
+            // thread these are FOLLOW-UPS (gentle nudge / direct ask / brief
+            // bump) — chasing, not answering.
+            const angles: DraftAngle[] = (["warm", "direct", "brief"] as DraftAngleTone[]).map(
+              (tone, i) => ({ id: `${c.id}a${i + 1}`, tone, text: angleSet[tone] }),
+            );
+            return { ...c, draft: { ...c.draft, status: "angles_ready", angles } };
+          }),
+          audit: pushAudit(
+            s.audit,
+            { actor: "hermes", surface: "ui", action: "draft.angles", resource: conv.id, result: "allowed" },
+            s.now,
+          ),
+        };
+      });
     }, MOCK_ANGLES_MS);
   },
 
@@ -546,6 +574,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     const text = instruction.trim();
     if (!conv || !text) return;
+    // R4 sweep: iterate only continues a STANDING draft — never a pending
+    // request (stale base + the angles timer would collide), a sent receipt
+    // (resurrecting sent_mock re-armed the Draft chip), or a diverged
+    // composer (R3 rule: the composer owns the flow once edited). The studio
+    // input is disabled in the locked states so this guard isn't a dead end.
+    const ds = conv.draft.status;
+    if (ds !== "generated" && ds !== "iterated" && ds !== "added_to_chat") return;
     const base = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     if (!base) return;
     const userMsg: DraftChatMsg = { id: `${conv.id}ch${(conv.draft.chat?.length ?? 0) + 1}`, role: "user", text };
@@ -560,38 +595,52 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       ),
     }));
     window.setTimeout(() => {
-      set((s) => ({
-        draftingId: s.draftingId === conv.id ? null : s.draftingId,
-        conversations: s.conversations.map((c) => {
-          if (c.id !== conv.id) return c;
-          const vid = `${c.id}d${c.draft.versions.length + 1}`;
-          const { text: newText, ack } = applyInstruction(base.text, text);
-          const hermesMsg: DraftChatMsg = {
-            id: `${c.id}ch${(c.draft.chat?.length ?? 0) + 1}`,
-            role: "hermes",
-            text: ack,
-            versionId: vid,
-          };
-          return {
-            ...c,
-            draft: {
-              ...c.draft,
-              status: "iterated",
-              chat: [...(c.draft.chat ?? []), hermesMsg],
-              versions: [
-                ...c.draft.versions,
-                { id: vid, createdAt: new Date(s.now).toISOString(), instructions: text, text: newText },
-              ],
-              activeVersionId: vid,
-            },
-          };
-        }),
-        audit: pushAudit(
-          s.audit,
-          { actor: "hermes", surface: "ui", action: "draft.iterate", resource: conv.id, result: "allowed" },
-          s.now,
-        ),
-      }));
+      set((s) => {
+        const clearSpin = { draftingId: s.draftingId === conv.id ? null : s.draftingId };
+        // R4 sweep (same rule as the angles timer): a send or reset during
+        // the window supersedes the iteration — drop it. If the draft moved
+        // to added_to_chat/edited meanwhile, the new version still joins the
+        // stepper but takes NEITHER the status NOR the active pointer: the
+        // composer owns the flow, and stealing added_to_chat would break the
+        // divergence tracking (M6) that protects the human's edits.
+        const cur = s.conversations.find((x) => x.id === conv.id);
+        const cs = cur?.draft.status;
+        if (cs !== "generated" && cs !== "iterated" && cs !== "added_to_chat" && cs !== "edited")
+          return clearSpin;
+        const preserve = cs === "added_to_chat" || cs === "edited";
+        return {
+          ...clearSpin,
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conv.id) return c;
+            const vid = `${c.id}d${c.draft.versions.length + 1}`;
+            const { text: newText, ack } = applyInstruction(base.text, text);
+            const hermesMsg: DraftChatMsg = {
+              id: `${c.id}ch${(c.draft.chat?.length ?? 0) + 1}`,
+              role: "hermes",
+              text: ack,
+              versionId: vid,
+            };
+            return {
+              ...c,
+              draft: {
+                ...c.draft,
+                status: preserve ? c.draft.status : "iterated",
+                chat: [...(c.draft.chat ?? []), hermesMsg],
+                versions: [
+                  ...c.draft.versions,
+                  { id: vid, createdAt: new Date(s.now).toISOString(), instructions: text, text: newText },
+                ],
+                activeVersionId: preserve ? c.draft.activeVersionId : vid,
+              },
+            };
+          }),
+          audit: pushAudit(
+            s.audit,
+            { actor: "hermes", surface: "ui", action: "draft.iterate", resource: conv.id, result: "allowed" },
+            s.now,
+          ),
+        };
+      });
     }, MOCK_ITERATE_MS);
   },
 
@@ -624,11 +673,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     const version = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     if (!conv || !version) return;
-    // R3: once the composer has DIVERGED (edited), re-adding would overwrite
-    // the human's work — the keyboard path was guarded in R2, this closes
-    // the panel-button and palette paths. added_to_chat stays allowed:
-    // stepper re-add of an undiverged draft loses nothing.
-    if (conv.draft.status === "edited") return;
+    // R3+R4-3: add-to-chat only serves a STANDING draft. edited would
+    // overwrite the human's diverged work; requested/angles_ready would
+    // prefill a STALE version and the pending timer would then stomp
+    // added_to_chat back; sent_mock is a receipt. added_to_chat stays
+    // allowed: stepper re-add of an undiverged draft loses nothing.
+    const ds = conv.draft.status;
+    if (ds !== "generated" && ds !== "iterated" && ds !== "added_to_chat") return;
     set((s) => ({
       composerText: version.text,
       composerFocusTick: s.composerFocusTick + 1,
@@ -744,7 +795,18 @@ export const useInboxStore = create<InboxState>((set, get) => ({
                 body: text,
               },
             ],
-            draft: fromHermes ? { ...c.draft, status: "sent_mock" as const } : c.draft,
+            // R4-1: a send supersedes ANY standing draft, not just the one it
+            // came from — a live Draft chip + add-to-chat offering an
+            // obsolete reply after a manual send was a lie. Versions produced
+            // become a sent receipt; a request/angles with no versions yet
+            // resets clean (nothing real was lost; d starts fresh). Pending
+            // angles die here, and the async timers skip (R4-2 guards).
+            draft:
+              c.draft.status === "not_started"
+                ? c.draft
+                : c.draft.versions.length === 0
+                  ? { ...c.draft, status: "not_started" as const, angles: undefined }
+                  : { ...c.draft, status: "sent_mock" as const, angles: undefined },
           };
         }),
         audit: pushAudit(

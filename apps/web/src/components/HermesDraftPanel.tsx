@@ -202,6 +202,12 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
   const chat = draft.chat ?? [];
   const sent = draft.status === "sent_mock";
   const edited = draft.status === "edited"; // composer diverged — re-add would overwrite it (R3)
+  // R4 sweep: iterating a receipt or a diverged composer is store-guarded —
+  // the chat input locks too, so the guard never reads as a dead control.
+  const chatLocked = sent || edited;
+  const chatLockReason = sent
+    ? "Draft sent — start a new one with d"
+    : "The composer has your edits — send from there";
 
   // `r` focuses the chat input — next frame, so the keystroke never leaks in.
   // Track the last-SEEN tick: reacting to the tick's VALUE meant a Studio
@@ -222,7 +228,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
 
   const submit = () => {
     const text = input.trim();
-    if (!text || drafting) return;
+    if (!text || drafting || chatLocked) return;
     iterateDraft(text);
     setInput("");
   };
@@ -324,7 +330,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
                 setInput((cur) => (cur ? `${cur} ${chip.insert}` : chip.insert));
                 inputRef.current?.focus();
               }}
-              disabled={drafting}
+              disabled={drafting || chatLocked}
               className="rounded-full border border-border px-2 py-0.5 text-[0.6875rem] text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent hover:text-foreground disabled:opacity-40"
             >
               {chip.label}
@@ -332,7 +338,10 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
           ))}
         </div>
 
-        <div className="flex items-end gap-1.5 rounded-lg border border-border bg-card px-2 py-1 transition-colors focus-within:border-[color-mix(in_oklch,var(--hermes)_45%,transparent)]">
+        <div
+          title={chatLocked ? chatLockReason : undefined}
+          className="flex items-end gap-1.5 rounded-lg border border-border bg-card px-2 py-1 transition-colors focus-within:border-[color-mix(in_oklch,var(--hermes)_45%,transparent)] has-[textarea:disabled]:opacity-60"
+        >
           <textarea
             ref={inputRef}
             rows={1}
@@ -348,12 +357,14 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="Tell Hermes what to change…"
+            disabled={chatLocked}
+            placeholder={chatLocked ? chatLockReason : "Tell Hermes what to change…"}
             aria-label="Refine the draft"
             className="max-h-[80px] min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[0.75rem] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:!shadow-none"
           />
-          {/* v7: the key lives ON the control — r focuses this input. */}
-          {!input && !inputFocused && (
+          {/* v7: the key lives ON the control — r focuses this input.
+              Hidden while locked: a keycap on a disabled input would lie. */}
+          {!input && !inputFocused && !chatLocked && (
             <span aria-hidden className="mb-0.5 flex">
               <Kbd>r</Kbd>
             </span>
@@ -361,7 +372,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
           <button
             type="button"
             onClick={submit}
-            disabled={!input.trim() || drafting}
+            disabled={!input.trim() || drafting || chatLocked}
             aria-label="Send instruction to Hermes"
             className={cn(
               "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",

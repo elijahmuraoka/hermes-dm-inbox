@@ -7,6 +7,7 @@ export function Topbar() {
   const setDrawer = useInboxStore((s) => s.setDrawer);
   const loadState = useInboxStore((s) => s.loadState);
   const synced = loadState === "ready";
+  const errored = loadState === "error";
 
   return (
     <header className="flex h-11 min-w-0 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
@@ -31,16 +32,25 @@ export function Topbar() {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <span className="flex items-center gap-1.5 text-[0.71875rem] text-muted-foreground">
-          {/* In-flight is neutral slate, not amber — amber = Hermes presence only. */}
+        <span
+          className="flex items-center gap-1.5 text-[0.71875rem] text-muted-foreground"
+          title={errored ? "iMessage didn’t respond — retry from the list" : undefined}
+        >
+          {/* In-flight is neutral slate, not amber — amber = Hermes presence
+              only. R4-4: an errored sync says so — "Syncing…" next to the
+              error state was a lie. */}
           <span
             className="size-1.5 rounded-full"
             style={{
-              background: synced ? "var(--status-ok)" : "var(--view-all)",
-              boxShadow: synced ? "0 0 6px var(--status-ok)" : "0 0 6px var(--view-all)",
+              background: errored
+                ? "var(--destructive)"
+                : synced
+                  ? "var(--status-ok)"
+                  : "var(--view-all)",
+              boxShadow: `0 0 6px ${errored ? "var(--destructive)" : synced ? "var(--status-ok)" : "var(--view-all)"}`,
             }}
           />
-          {synced ? "Synced" : "Syncing…"}
+          {errored ? "Sync failed" : synced ? "Synced" : "Syncing…"}
         </span>
         {/* One clean keycap — not two command symbols side by side. */}
         <button

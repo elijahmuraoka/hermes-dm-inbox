@@ -288,14 +288,13 @@ export function CommandPalette() {
         keys: "e",
         icon: FileText,
         run: withClose(() => addToChat()),
-        // sent_mock: the draft is a receipt now (L2). edited: the composer
-        // has diverged work a re-add would overwrite (R3). Same guards as
-        // the studio button.
+        // R4-3 (mirrors the store guard): only a STANDING draft can be
+        // added — not a receipt (L2), not diverged composer work (R3), and
+        // not a pending request whose versions are stale (R4).
         disabled:
           !selected ||
           selected.draft.versions.length === 0 ||
-          selected.draft.status === "sent_mock" ||
-          selected.draft.status === "edited",
+          !["generated", "iterated", "added_to_chat"].includes(selected.draft.status),
       },
       {
         id: "composer-reply",
