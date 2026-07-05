@@ -201,6 +201,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
   const active = versions[activeIdx];
   const chat = draft.chat ?? [];
   const sent = draft.status === "sent_mock";
+  const edited = draft.status === "edited"; // composer diverged — re-add would overwrite it (R3)
 
   // `r` focuses the chat input — next frame, so the keystroke never leaks in.
   // Track the last-SEEN tick: reacting to the tick's VALUE meant a Studio
@@ -374,13 +375,16 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
         </div>
 
         {/* Once sent, the button is a receipt, not a control — re-running
-            add-to-chat put a duplicate send one ⌘Enter away (review L2). */}
+            add-to-chat put a duplicate send one ⌘Enter away (review L2).
+            Once the composer diverges (edited), re-add would overwrite the
+            human's work (R3) — sending from the composer is the way forward. */}
         <Button
           variant={sent ? "secondary" : "primary"}
           size="sm"
           className="w-full"
           onClick={addToChat}
-          disabled={drafting || sent}
+          disabled={drafting || sent || edited}
+          title={edited ? "The composer has your edits — send from there" : undefined}
         >
           {sent ? <Check /> : <SendHorizontal />} {sent ? "Sent" : "Add to chat"}{" "}
           <Kbd

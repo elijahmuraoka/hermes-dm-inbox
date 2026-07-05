@@ -624,6 +624,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     const version = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     if (!conv || !version) return;
+    // R3: once the composer has DIVERGED (edited), re-adding would overwrite
+    // the human's work — the keyboard path was guarded in R2, this closes
+    // the panel-button and palette paths. added_to_chat stays allowed:
+    // stepper re-add of an undiverged draft loses nothing.
+    if (conv.draft.status === "edited") return;
     set((s) => ({
       composerText: version.text,
       composerFocusTick: s.composerFocusTick + 1,

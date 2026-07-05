@@ -8,7 +8,9 @@ import { XL_QUERY } from "@/lib/constants";
 // DISPATCH PRIORITY (review M3/L3 — order is load-bearing):
 //   1. Escape — palette first, then typing scope owns it (inputs blur
 //      themselves; one press = one layer), then the overlay cascade.
-//   2. Palette open → it owns every key.
+//   2. Palette open → it owns every key. Shortcut sheet open → hotkeys
+//      OFF (R3: a true modal must not let e/s/d/j/k mutate state invisibly
+//      behind it; Esc is handled above).
 //   3. Typing targets → no hotkeys.
 //   4. Pending `g` chord → consume the key WHATEVER it is (a failed chord
 //      must not fall through: `g e` archiving a thread was a live defect).
@@ -51,6 +53,7 @@ export function useKeyboard() {
         return;
       }
       if (st.paletteOpen) return; // palette owns keys while open
+      if (st.shortcutsOpen) return; // R3: no invisible mutations behind the ? modal
       if (isTyping(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 

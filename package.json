@@ -6,9 +6,9 @@
   "packageManager": "bun@1.3.11",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "bun --cwd apps/web run dev",
-    "build": "bun --cwd apps/web run build",
-    "typecheck": "bun --cwd apps/web run typecheck",
+    "dev": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "typecheck": "bun run --cwd apps/web typecheck",
     "test": "echo 'No tests yet: spec-first repo'",
     "docs:audit": "tomoji docs audit",
     "docs:index": "tomoji docs index --verify"
