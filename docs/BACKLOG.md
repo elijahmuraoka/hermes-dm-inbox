@@ -19,6 +19,11 @@ Fix batch R1 took H1-H3, M1-M7, and the cheap Lows; these were explicitly deferr
 - **vitest seam.** Zero-config under Vite 6; first targets: deriveVisible + predicates (the whole view
   contract, fixed clock), then mock-hermes once extracted (M8), then store transitions with a
   matchMedia stub. Deferred so tests land against the post-M8 module layout, not before it.
+- **M3 residual (R2): keyboard archive on draft-active threads.** `e` is now a no-op in ALL four
+  draft-active states (requested/angles_ready/added_to_chat/edited) — a key-slip can't destroy
+  in-flight work, but keyboard-only users have NO archive key on such threads (mouse hover-Done and
+  the palette command remain). Open question: dedicate `shift+E` as archive-regardless-of-draft
+  (merges the older spot-check nit below) — needs Elijah's call on the binding.
 
 ## Polish — from the v7 feel pass (2026-07-04, non-blocking)
 

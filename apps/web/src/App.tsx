@@ -10,6 +10,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutSheet } from "@/components/ShortcutSheet";
 import { NoSelection } from "@/components/StatusStates";
 import { Kbd } from "@/components/ui/kbd";
+import { FocusTrap } from "@/components/ui/focus-trap";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { XL_QUERY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -118,7 +119,8 @@ export default function App() {
           className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm"
           onClick={() => setDraftSheet(false)}
         >
-          <div
+          {/* R2: the fourth aria-modal gets the same trap as the other three. */}
+          <FocusTrap
             role="dialog"
             aria-modal="true"
             aria-label="Hermes draft"
@@ -129,7 +131,7 @@ export default function App() {
               <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
             </div>
             <HermesDraftPanel conversation={selected} mode="sheet" />
-          </div>
+          </FocusTrap>
         </div>
       )}
 

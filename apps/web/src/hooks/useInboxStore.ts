@@ -761,7 +761,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       });
       // Post-commit truth: the selection stays on this thread for the routing
       // strip, but if its row left the view, j/k needs the old slot (M1).
-      if (beforeIdx !== -1 && !get().visibleConversations().some((c) => c.id === conv.id))
+      // Selection guard (R2): a j/k during the 150ms exit window already
+      // moved on — re-arming a stale index would teleport the next j/k.
+      if (
+        beforeIdx !== -1 &&
+        get().selectedId === conv.id &&
+        !get().visibleConversations().some((c) => c.id === conv.id)
+      )
         set({ orphanIdx: beforeIdx });
     });
   },

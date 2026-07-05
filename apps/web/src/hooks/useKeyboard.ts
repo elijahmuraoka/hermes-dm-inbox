@@ -102,10 +102,14 @@ export function useKeyboard() {
           e.preventDefault();
           const ds = st.selected()?.draft.status;
           if (ds === "generated" || ds === "iterated") return void st.addToChat();
-          // M3: a draft in flight makes `e` a no-op — one key-slip in the
-          // hero loop must never archive the thread and destroy the draft.
-          // Archiving a drafted thread needs its dedicated path (BACKLOG).
-          if (ds === "requested" || ds === "angles_ready") return;
+          // M3 (completed in R2): EVERY draft-active state makes `e` a no-op —
+          // one key-slip must never archive the thread and destroy in-flight
+          // work. added_to_chat/edited included: blur-then-e was wiping
+          // diverged composer edits unrecoverably. Archive stays reachable
+          // via the hover Done button and the palette; a dedicated key
+          // (shift+E?) is an open BACKLOG question.
+          if (ds === "requested" || ds === "angles_ready" || ds === "added_to_chat" || ds === "edited")
+            return;
           return void st.markDone();
         }
         case "s":

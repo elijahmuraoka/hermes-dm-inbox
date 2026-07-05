@@ -1,14 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /** aria-modal must mean it (review M5): focus moves in on open, Tab cycles
     inside the dialog, and focus restores to the opener on close. Attach the
     ref to the dialog root; give the root tabIndex={-1} if it can render with
     no focusable children (the panel itself then takes focus). */
 export function useFocusTrap(ref: React.RefObject<HTMLElement | null>) {
+  // Opener captured at MOUNT-RENDER time, not in the effect (R2): cmdk's
+  // autoFocus runs at commit, so an effect-time capture records the dialog's
+  // own input and "restore" lands on body. The consumer (FocusTrap / the
+  // drawer) mounts fresh per open, so the initializer sees the pre-open focus.
+  const [opener] = useState<HTMLElement | null>(
+    () => document.activeElement as HTMLElement | null,
+  );
   useEffect(() => {
     const panel = ref.current;
     if (!panel) return;
-    const opener = document.activeElement as HTMLElement | null;
     const focusables = () =>
       Array.from(
         panel.querySelectorAll<HTMLElement>(
@@ -39,5 +45,5 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement | null>) {
       panel.removeEventListener("keydown", onKey);
       opener?.focus();
     };
-  }, [ref]);
+  }, [ref, opener]);
 }
