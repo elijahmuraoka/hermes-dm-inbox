@@ -116,15 +116,21 @@ export default function App() {
           behind an invisible overlay and re-pops uninvited on re-narrow. */}
       {drawerOpen && <DrawerAutoClose onClose={() => setDrawer(false)} />}
 
-      {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
-          thread's Draft button, or any draft request. Never a silent mutation.
+      {/* Below xl the hero loop lives in an overlay surface — opened by `d`,
+          the thread's Draft button, or any draft request. Never a silent
+          mutation. R20 (Elijah): the ANCHOR is responsive — bottom sheet
+          below md (phone pattern), RIGHT drawer md–xl (horizontal room);
+          same state, same trap, same key matrix, only the presentation
+          changes. A persistent panel at lg would starve the thread pane
+          (~rail+list+21.25rem leaves <300px at 1024) — overlay keeps the
+          reading balance.
           PINNED (R9 audit, R10): draftSheetOpen deliberately OUTLIVES an
           xl-crossing — above xl the side panel shows the same surface, so a
-          re-narrow RESUMING the sheet is continuity, not stale state; the
+          re-narrow RESUMING the surface is continuity, not stale state; the
           key/Esc arms are visibility-gated (XL_QUERY). Do not "fix". */}
       {selected && draftSheetOpen && !isXl && (
         <div
-          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm"
+          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm md:flex-row"
           onClick={() => setDraftSheet(false)}
         >
           {/* R2: the fourth aria-modal gets the same trap as the other three. */}
@@ -132,10 +138,15 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-label="Hermes draft"
-            className="animate-sheet-up flex max-h-[78dvh] min-h-[320px] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card shadow-2xl"
+            className={cn(
+              "animate-sheet-up flex max-h-[78dvh] min-h-[320px] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card shadow-2xl",
+              "md:ml-auto md:h-full md:max-h-none md:w-[21.25rem] md:animate-drawer-in-right md:rounded-none md:border-l md:border-t-0",
+            )}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-center pt-2" aria-hidden>
+            {/* grab handle — a phone affordance; the md+ drawer has the
+                panel's own close button */}
+            <div className="flex justify-center pt-2 md:hidden" aria-hidden>
               <span className="h-1 w-9 rounded-full bg-muted-foreground/30" />
             </div>
             <HermesDraftPanel conversation={selected} mode="sheet" />

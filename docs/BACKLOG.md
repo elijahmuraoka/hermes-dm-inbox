@@ -19,11 +19,13 @@ Fix batch R1 took H1-H3, M1-M7, and the cheap Lows; these were explicitly deferr
 - **vitest seam.** Zero-config under Vite 6; first targets: deriveVisible + predicates (the whole view
   contract, fixed clock), then mock-hermes once extracted (M8), then store transitions with a
   matchMedia stub. Deferred so tests land against the post-M8 module layout, not before it.
-- **M3 residual (R2): keyboard archive on draft-active threads.** `e` is now a no-op in ALL four
-  draft-active states (requested/angles_ready/added_to_chat/edited) — a key-slip can't destroy
-  in-flight work, but keyboard-only users have NO archive key on such threads (mouse hover-Done and
-  the palette command remain). Open question: dedicate `shift+E` as archive-regardless-of-draft
-  (merges the older spot-check nit below) — needs Elijah's call on the binding.
+- **M3 residual (R2): keyboard archive on draft-active threads — RESOLVED by R20's e/a split**
+  (Elijah's call, 2026-07-06: "add to chat and mark as done are both e, that can be dangerous").
+  `e` = mark done everywhere; `a` = add draft to chat. `e` now archives STANDING-card threads
+  (generated/iterated — versions survive markDone, nothing lost), which was the missing keyboard
+  path; the M3 no-op stays for in-flight/handoff states (requested/angles_ready/added_to_chat/
+  edited) where a slip would destroy composer-carried work. The `shift+E` question is closed —
+  no extra binding needed.
 
 ## Polish — from the v7 feel pass (2026-07-04, non-blocking)
 
@@ -78,10 +80,9 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
   sync/refresh globally and regenerate when draft-focused; the slice binds `r` only to regenerate.
   The phantom "Sync all sources" palette command was deleted (honesty guardrail). When real mock
   sync lands, implement it and resolve the `r` scoping (contextual binding or a new key).
-- **Nit — no keyboard path to archive a drafted thread** (spot-check note, 2026-07-03). On a
-  drafted thread `e` = add-to-chat wins over archive — correct priority, but the only way to mark
-  a drafted thread done is the palette/mouse. Add a dedicated key (e.g. `shift+E`) for
-  archive-regardless-of-draft.
+- **Nit — no keyboard path to archive a drafted thread — RESOLVED by R20's e/a split** (see the
+  M3-residual entry above): `e` now archives standing-card threads directly; in-flight/handoff
+  states keep the slip guard. No `shift+E` needed.
 - **Nit — connector settings surface** (contract): source health/last-sync/capabilities screen —
   not started in the slice.
 - **Nit — audit/share log surface**: audit events are recorded in the store but there is no UI to

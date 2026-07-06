@@ -408,7 +408,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
                 "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground",
             )}
           >
-            e
+            a
           </Kbd>
         </Button>
       </div>

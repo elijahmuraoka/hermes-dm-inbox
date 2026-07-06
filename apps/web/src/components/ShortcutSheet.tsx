@@ -25,7 +25,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Triage",
     rows: [
-      ["e", "Mark done — acknowledges an FYI (Add to chat when a draft is picked)"],
+      ["e", "Mark done — acknowledges an FYI (no-op while a draft is in flight)"],
       ["s", "Snooze (hidden until it returns)"],
       ["p", "Toggle priority"],
     ],
@@ -35,7 +35,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
     rows: [
       ["d", "Draft reply — a follow-up on Sent threads"],
       ["1 2 3", "Pick a draft angle"],
-      ["e", "Add picked draft to chat"],
+      ["a", "Add picked draft to chat"],
       ["c", "Focus composer"],
       ["⌘⏎", "Send message"],
       ["r", "Refine draft (focus studio chat)"],

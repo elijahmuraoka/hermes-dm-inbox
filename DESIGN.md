@@ -242,8 +242,11 @@ Each ships with **all states** — default · hover · focus-visible · selected
    turns link to their version). Tone chips are **quick-inserts into the chat input**, not separate
    controls. No Instructions/Model/provenance meta rows — **the chat IS the instruction record**.
    **Every control carries intent: there is no bare Regenerate** — re-generation happens only through the
-   chat with words attached (`r` focuses the chat input). "Add to chat" (`e`) stays the primary action;
-   the composer remains the only send surface. Side rail at `xl+`, bottom sheet below.
+   chat with words attached (`r` focuses the chat input). "Add to chat" (`a`) stays the primary action
+   (R20: dedicated key — `e` is mark-done everywhere; one key for two distant actions was slip-bait);
+   the composer remains the only send surface. Side rail at `xl+`; below that the surface is an overlay
+   whose ANCHOR is responsive (R20): bottom sheet under `md` (phone pattern), right-anchored drawer
+   `md`–`xl` (horizontal room) — same state, same trap, same key matrix, only the presentation changes.
 4b. **Composer** — standard messenger composer at the thread's bottom: auto-grow textarea, attachment
    button, Send. `c` or `Enter`-in-thread focuses it; `⌘Enter` sends; `Esc` returns to list scope.
    Sending appends the outgoing message — **presented exactly as a real send** (diegetic rule, §7). That

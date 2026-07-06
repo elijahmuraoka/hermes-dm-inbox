@@ -307,7 +307,10 @@
     opacity: 1;
   }
 }
-.animate-sheet-up {
+/* @utility (not a plain class): the draft surface swaps animations at md
+   (R20) and only real utilities get responsive variants + correct layer
+   ordering against md:animate-drawer-in-right. */
+@utility animate-sheet-up {
   animation: sheet-up 200ms var(--ease-house);
 }
 @keyframes drawer-in {
@@ -322,6 +325,21 @@
 }
 .animate-drawer-in {
   animation: drawer-in 200ms var(--ease-house);
+}
+/* R20: the draft surface is a RIGHT drawer at md–xl (bottom sheet is a
+   phone pattern; side-anchored where there's horizontal room). */
+@keyframes drawer-in-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@utility animate-drawer-in-right {
+  animation: drawer-in-right 200ms var(--ease-house);
 }
 .animate-stream {
   animation: stream-line 260ms var(--ease-house) both;

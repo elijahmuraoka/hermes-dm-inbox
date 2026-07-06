@@ -89,10 +89,10 @@ export function useKeyboard() {
           e.key === "1" || e.key === "2" || e.key === "3" || // angle pick
           e.key === "r" || // refine — focus the studio chat
           e.key === "d" || // legitimate re-draft (the store guards the rest)
-          e.key === "u" || // backToList also closes the sheet — a visible exit
-          e.key === "/" || e.key === "?" || // palette/help stack ABOVE the sheet
-          (e.key === "e" && (ds === "generated" || ds === "iterated")); // add to chat only
-        if (!live) return; // j/k s p c Enter g-chords e-as-markDone: swallowed
+          e.key === "u" || // backToList also closes the surface — a visible exit
+          e.key === "/" || e.key === "?" || // palette/help stack ABOVE the surface
+          (e.key === "a" && (ds === "generated" || ds === "iterated")); // add to chat (R20: was e)
+        if (!live) return; // j/k s p c e Enter g-chords: swallowed
       }
       // The drawer (the fourth aria-modal) is pure navigation: view chords
       // pass (setView closes it — a visible outcome), overlays stack above;
@@ -155,22 +155,31 @@ export function useKeyboard() {
           e.preventDefault();
           return void st.setShortcuts(true);
         case "e": {
-          // Contextual: with a picked draft on the card, e = Add to chat
-          // (the primary draft action); otherwise e = mark done.
-          // preventDefault ALWAYS: this hotkey can move focus into the
-          // composer, and the keystroke must never type a literal "e" there.
+          // R20 (Elijah): e = mark done EVERYWHERE — one key mapping to two
+          // semantically distant actions on hidden draft state was slip-bait.
+          // Add-to-chat moved to its own key (`a`). The M3 guard STAYS:
+          // in-flight or handed-off draft work (requested/angles_ready/
+          // added_to_chat/edited) makes e a no-op — a slip must never
+          // archive the thread and destroy work the composer is carrying.
+          // A STANDING card (generated/iterated) archives fine: versions
+          // survive markDone, nothing is lost. This also resolves the old
+          // BACKLOG shift+E question — e now IS the archive key on drafted
+          // threads.
           e.preventDefault();
           const ds = st.selected()?.draft.status;
-          if (ds === "generated" || ds === "iterated") return void st.addToChat();
-          // M3 (completed in R2): EVERY draft-active state makes `e` a no-op —
-          // one key-slip must never archive the thread and destroy in-flight
-          // work. added_to_chat/edited included: blur-then-e was wiping
-          // diverged composer edits unrecoverably. Archive stays reachable
-          // via the hover Done button and the palette; a dedicated key
-          // (shift+E?) is an open BACKLOG question.
           if (ds === "requested" || ds === "angles_ready" || ds === "added_to_chat" || ds === "edited")
             return;
           return void st.markDone();
+        }
+        case "a": {
+          // R20: add the picked draft to the chat — dedicated key (mnemonic;
+          // plain `a` was free: only a g-chord terminal, and a pending chord
+          // consumes its key before this case). preventDefault ALWAYS: the
+          // action moves focus into the composer and the keystroke must
+          // never type a literal "a" there. The store guards the rest
+          // (standing card only, R4-3; not mid-iterate, R8).
+          e.preventDefault();
+          return void st.addToChat();
         }
         case "s":
           return void st.snooze();

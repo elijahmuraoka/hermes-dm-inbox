@@ -317,7 +317,7 @@ export function CommandPalette() {
         label: "Add draft to chat",
         group: "Draft",
         scope: "thread",
-        keys: "e",
+        keys: "a", // R20: dedicated key — e is mark-done everywhere now
         icon: FileText,
         // R9 sweep (same ordering rule as Send/Reply): close FIRST, then the
         // focus-bumping action — its rAF focus must land after the trap's
