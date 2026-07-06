@@ -270,14 +270,16 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // selection to row 0 or clear typed composer text. "keep" still anchors
     // the first row when nothing is selected, so initial anchoring survives.
     const same = v === get().activeView;
-    // exitingIds cleared: an in-flight exit predicted against the OLD view
-    // must not keep collapsing its row in the new one (review L4).
+    // exitingIds cleared on a REAL change only: an in-flight exit predicted
+    // against the OLD view must not keep collapsing its row in the new one
+    // (review L4) — but the L4 rationale is cross-view; wiping it on a
+    // same-view chord flashed a mid-exit row back until its commit (R6).
     set({
       activeView: v,
       mobilePane: "list",
       draftSheetOpen: false,
       drawerOpen: false,
-      exitingIds: [],
+      ...(same ? {} : { exitingIds: [] }),
     });
     reanchor(set, get, same ? "keep" : "top");
   },
@@ -464,20 +466,34 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 
   // One-tap on the post-send strip: mark done ↔ reopen (back to Sent).
+  // R6: the flip routes through the SAME predict/exit/advance flow as
+  // markDone — a bare set changed view membership with no exit animation,
+  // and from Sent with done hidden it orphaned the selection with no
+  // recorded position (next j/k yanked to row 0). The reopen direction
+  // predicts the row stays and commits instantly.
   flipRouting: () => {
     const conv = get().selected();
-    if (!conv?.routedAfterSend) return;
+    if (!conv?.routedAfterSend || get().exitingIds.includes(conv.id)) return;
     const next: ThreadStatus = conv.status === "done" ? "sent" : "done";
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, status: next } : c,
-      ),
-      audit: pushAudit(
-        s.audit,
-        { actor: "human", surface: "ui", action: `triage.route.${next}`, resource: conv.id, result: "allowed" },
-        s.now,
-      ),
-    }));
+    const beforeIdx = get()
+      .visibleConversations()
+      .findIndex((c) => c.id === conv.id);
+    const predicted = get().conversations.map((c) =>
+      c.id === conv.id ? { ...c, status: next } : c,
+    );
+    exitThenCommit(set, get, conv.id, predicted, () => {
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === conv.id ? { ...c, status: next } : c,
+        ),
+        audit: pushAudit(
+          s.audit,
+          { actor: "human", surface: "ui", action: `triage.route.${next}`, resource: conv.id, result: "allowed" },
+          s.now,
+        ),
+      }));
+      advanceSelection(set, get, beforeIdx);
+    });
   },
 
   requestDraft: () => {
@@ -779,9 +795,23 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // Only the data flip waits for the row's exit animation (Important only;
     // in Sent/All the row stays visible and everything commits at once).
     set({ composerText: "", composerAttach: false });
+    // R6 sweep: the prediction must terminalize the draft the way the commit
+    // does — hasDraft flips false on send, and under an active has-draft
+    // filter a stays-prediction let the row pop out with no exit animation.
     const predicted = get().conversations.map((c) =>
       c.id === conv.id
-        ? { ...c, status: "sent" as const, unread: false, lastActivity: new Date(get().now).toISOString() }
+        ? {
+            ...c,
+            status: "sent" as const,
+            unread: false,
+            lastActivity: new Date(get().now).toISOString(),
+            draft:
+              c.draft.status === "not_started"
+                ? c.draft
+                : c.draft.versions.length === 0
+                  ? { ...c.draft, status: "not_started" as const, angles: undefined }
+                  : { ...c.draft, status: "sent_mock" as const, angles: undefined },
+          }
         : c,
     );
     exitThenCommit(set, get, conv.id, predicted, () => {
@@ -927,7 +957,10 @@ function applyFilters(
     (k) => patch[k] !== cur[k],
   );
   if (!changed) {
-    set({ mobilePane: "list", drawerOpen: false });
+    // R6: drawer only — forcing mobilePane here navigated a mobile reader
+    // out of an open thread just for tapping the already-active source in
+    // the drawer. A no-op must not cost the reading position either.
+    set({ drawerOpen: false });
     return;
   }
   // exitingIds cleared for the same reason as setView (review L4).
