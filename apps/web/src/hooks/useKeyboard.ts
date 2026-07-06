@@ -113,12 +113,20 @@ export function useKeyboard() {
         case "k":
           e.preventDefault();
           return void st.selectPrev();
-        case "Enter":
+        case "Enter": {
+          // R10 (a11y): a keyboard user may have TABbed onto a real control —
+          // native activation must win over the list mapping (Retry sync,
+          // filter chips, theme toggle, links). ONLY Enter defers: single-
+          // letter hotkeys firing over a focused button is standard
+          // reference-inbox behavior and stays.
+          const t = e.target as HTMLElement | null;
+          if (t?.closest?.('button, a[href], select, summary, [role="button"]')) return;
           // From the list: open the thread. Already in the thread: focus the
           // composer (the natural next act is replying).
           e.preventDefault();
           if (st.mobilePane === "thread") return void st.focusComposer();
           return void st.openThread();
+        }
         case "c":
           // Reply: jump straight to the composer.
           e.preventDefault();

@@ -1154,7 +1154,12 @@ function advanceSelection(
 ) {
   const after = get().visibleConversations();
   if (after.some((c) => c.id === get().selectedId)) return;
-  const next = after[clampIdx(beforeIdx, after)] ?? null;
+  // R10: a hidden-but-open thread (post-send routing strip) reaches here
+  // with beforeIdx -1 — the caller couldn't find the row in the view. Fall
+  // back to the recorded orphan slot, not row 0: the same M1 rule
+  // selectNext/selectPrev already apply to an orphaned selection.
+  const at = beforeIdx < 0 ? (get().orphanIdx ?? 0) : beforeIdx;
+  const next = after[clampIdx(at, after)] ?? null;
   // Composer is per-thread: a selection move clears it, same as j/k — and
   // the departing thread's handoff draft reconciles the same way (R7): a
   // done/snoozed thread must not keep claiming an emptied composer.

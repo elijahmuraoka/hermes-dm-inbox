@@ -117,7 +117,11 @@ export default function App() {
       {drawerOpen && <DrawerAutoClose onClose={() => setDrawer(false)} />}
 
       {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
-          thread's Draft button, or any draft request. Never a silent mutation. */}
+          thread's Draft button, or any draft request. Never a silent mutation.
+          PINNED (R9 audit, R10): draftSheetOpen deliberately OUTLIVES an
+          xl-crossing — above xl the side panel shows the same surface, so a
+          re-narrow RESUMING the sheet is continuity, not stale state; the
+          key/Esc arms are visibility-gated (XL_QUERY). Do not "fix". */}
       {selected && draftSheetOpen && !isXl && (
         <div
           className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm"
