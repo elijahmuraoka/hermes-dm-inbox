@@ -82,6 +82,7 @@ export function CommandPalette() {
   const sendMock = useInboxStore((s) => s.sendMock);
   const composerText = useInboxStore((s) => s.composerText);
   const selected = useInboxStore((s) => s.selected());
+  const draftingIds = useInboxStore((s) => s.draftingIds);
 
   // Two pages, Raycast-style: "main" and the person picker. Filtering by
   // person is ⌘K-reachable without flooding the main list with 45 names.
@@ -297,11 +298,13 @@ export function CommandPalette() {
         run: withClose(() => addToChat()),
         // R4-3 (mirrors the store guard): only a STANDING draft can be
         // added — not a receipt (L2), not diverged composer work (R3), and
-        // not a pending request whose versions are stale (R4).
+        // not a pending request whose versions are stale (R4). R8: nor
+        // mid-iterate — the active version is about to be superseded.
         disabled:
           !selected ||
           selected.draft.versions.length === 0 ||
-          !["generated", "iterated", "added_to_chat"].includes(selected.draft.status),
+          !["generated", "iterated", "added_to_chat"].includes(selected.draft.status) ||
+          draftingIds.includes(selected.id),
       },
       {
         id: "composer-reply",
@@ -358,7 +361,7 @@ export function CommandPalette() {
     return list;
     // Hand-maintained deps (no ESLint in this repo — review L14 dropped the
     // inert disable-comment; add react-hooks lint before trusting edits here).
-  }, [selected, composerText, filters, activeView, sortModes, showDoneInSent, collapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleSection, markDone, snooze, togglePriority, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
+  }, [selected, composerText, draftingIds, filters, activeView, sortModes, showDoneInSent, collapsed, setView, setSource, toggleUnreadFilter, toggleHasDraftFilter, clearFilters, setSortMode, toggleShowDone, toggleSection, markDone, snooze, togglePriority, requestDraft, addToChat, focusComposer, sendMock, setShortcuts]);
 
   const groups = useMemo(() => {
     const order = ["Navigate", "Filter", "Triage", "Draft", "Dev"];

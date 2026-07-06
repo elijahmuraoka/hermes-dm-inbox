@@ -439,7 +439,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       c.id === target ? { ...c, status: "done" as const, unread: false } : c,
     );
     exitThenCommit(set, get, target, predicted, () => {
+      // R8: canceling the pending REQUEST also settles its spinner marker and
+      // invalidates its timer — the token is what keeps that timer from
+      // completing a later request. Iterate ops keep running: typed intent
+      // still lands in the stepper, so their spinner stays honest.
+      const canceledReq = cancelDraftOps(target, "request");
       set((s) => ({
+        draftingIds: removeN(s.draftingIds, target, canceledReq),
         conversations: s.conversations.map((c) =>
           c.id === target
             ? { ...c, status: "done" as const, unread: false, draft: cancelPendingDraft(c.draft) }
@@ -526,7 +532,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       c.id === conv.id ? { ...c, status: next } : c,
     );
     exitThenCommit(set, get, conv.id, predicted, () => {
+      // R8: same pairing as markDone — the done direction settles the
+      // canceled request's marker and invalidates its timer token.
+      const canceledReq = next === "done" ? cancelDraftOps(conv.id, "request") : 0;
       set((s) => ({
+        draftingIds: removeN(s.draftingIds, conv.id, canceledReq),
         conversations: s.conversations.map((c) =>
           c.id === conv.id
             ? {
@@ -567,6 +577,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // switches (Elijah v4). lifecycle: requested → angles_ready → pick 1/2/3.
     // Open the sheet too: below xl the side panel doesn't exist, and a state
     // mutation with no visible feedback is a contract violation.
+    const token = beginDraftOp(conv.id, "request");
     set((s) => ({
       draftingIds: [...s.draftingIds, conv.id],
       draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
@@ -582,6 +593,10 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
     window.setTimeout(() => {
       set((s) => {
+        // R8: superseded (done/flip/send canceled us) — the canceler settled
+        // our marker, and completing now would finish a LATER request the
+        // status guard cannot tell apart from ours.
+        if (!settleDraftOp(conv.id, token)) return {};
         // Settle only OUR pending marker — drafts in flight on other threads
         // (or a second op on this one) keep their own spinners.
         const clearSpin = { draftingIds: removeOne(s.draftingIds, conv.id) };
@@ -667,6 +682,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const base = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
     if (!base) return;
     const userMsg: DraftChatMsg = { id: `${conv.id}ch${(conv.draft.chat?.length ?? 0) + 1}`, role: "user", text };
+    const token = beginDraftOp(conv.id, "iterate");
     // N2 class: every draft mutation opens its feedback surface (sheet <xl).
     set((s) => ({
       draftingIds: [...s.draftingIds, conv.id],
@@ -679,6 +695,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
     window.setTimeout(() => {
       set((s) => {
+        // R8: same token rule as the angles timer — a send superseded us and
+        // already settled the marker; do nothing at all.
+        if (!settleDraftOp(conv.id, token)) return {};
         const clearSpin = { draftingIds: removeOne(s.draftingIds, conv.id) };
         // R4 sweep (same rule as the angles timer): a send or reset during
         // the window supersedes the iteration — drop it. If the draft moved
@@ -763,6 +782,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // allowed: stepper re-add of an undiverged draft loses nothing.
     const ds = conv.draft.status;
     if (ds !== "generated" && ds !== "iterated" && ds !== "added_to_chat") return;
+    // R8 (same class as R4-3): during an iterate the status still reads
+    // generated/iterated, but the active version is about to be superseded —
+    // adding now copies STALE text the refinement never reaches, and the
+    // user can send pre-refinement words. The palette mirrors this guard;
+    // `e` no-oping through the window is M3-consistent.
+    if (get().draftingIds.includes(conv.id)) return;
     set((s) => ({
       composerText: version.text,
       composerFocusTick: s.composerFocusTick + 1,
@@ -869,9 +894,14 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         : c,
     );
     exitThenCommit(set, get, conv.id, predicted, () => {
+      // R8: R4-1's supersede is total — request AND iterate timers die here
+      // (both guards would drop their content anyway; now their markers
+      // settle at the send instead of lingering until the timers fire).
+      const canceledOps = cancelDraftOps(conv.id);
       set((s) => {
       const nowIso = new Date(s.now).toISOString();
       return {
+        draftingIds: removeN(s.draftingIds, conv.id, canceledOps),
         conversations: s.conversations.map((c) => {
           if (c.id !== conv.id) return c;
           const mid = `${c.id}m${c.messages.length + 1}`;
@@ -965,6 +995,51 @@ function clampIdx(idx: number, list: Conversation[]): number {
 function removeOne(ids: string[], id: string): string[] {
   const i = ids.indexOf(id);
   return i === -1 ? ids : [...ids.slice(0, i), ...ids.slice(i + 1)];
+}
+
+function removeN(ids: string[], id: string, n: number): string[] {
+  let out = ids;
+  for (let i = 0; i < n; i++) out = removeOne(out, id);
+  return out;
+}
+
+// R8: every async draft op (request/iterate) takes a TOKEN; a timer completes
+// only if its own token is still pending, and supersede sites invalidate the
+// outstanding tokens AND settle their draftingIds markers at that same
+// moment. The status guard alone could not distinguish requests: mark-done
+// then immediate re-request left the STALE timer seeing status "requested"
+// (the NEW request's) and completing it instantly — and until it fired, a
+// closed thread kept a lying spinner. Invariant: a superseded op neither
+// leaves its marker nor completes a later op.
+let draftOpSeq = 0;
+type DraftOpKind = "request" | "iterate";
+const pendingDraftOps = new Map<string, { token: number; kind: DraftOpKind }[]>();
+
+function beginDraftOp(id: string, kind: DraftOpKind): number {
+  const token = ++draftOpSeq;
+  pendingDraftOps.set(id, [...(pendingDraftOps.get(id) ?? []), { token, kind }]);
+  return token;
+}
+
+/** Timer-side: consume our token. False = superseded — the canceling site
+    already settled the marker; the timer must do NOTHING at all. */
+function settleDraftOp(id: string, token: number): boolean {
+  const ops = pendingDraftOps.get(id) ?? [];
+  if (!ops.some((o) => o.token === token)) return false;
+  pendingDraftOps.set(
+    id,
+    ops.filter((o) => o.token !== token),
+  );
+  return true;
+}
+
+/** Supersede-side: invalidate pending ops (optionally just one kind) and
+    report how many draftingIds markers the caller must settle with it. */
+function cancelDraftOps(id: string, kind?: DraftOpKind): number {
+  const ops = pendingDraftOps.get(id) ?? [];
+  const keep = kind ? ops.filter((o) => o.kind !== kind) : [];
+  pendingDraftOps.set(id, keep);
+  return ops.length - keep.length;
 }
 
 /** Mark one conversation read; returns the SAME array when nothing flips so
