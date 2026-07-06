@@ -383,7 +383,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const list = get().visibleConversations();
     if (!list.length) return;
     const idx = list.findIndex((c) => c.id === get().selectedId);
-    const at = idx === -1 ? clampIdx(get().orphanIdx ?? 0, list) : Math.max(idx - 1, 0);
+    // R12: the orphan fallback has DIRECTION. The row AT the vacated slot
+    // is the one that moved UP into it — j landing there reads as "down"
+    // (correct); k must land one ABOVE the slot, or it also feels like
+    // moving down from a row that no longer exists.
+    const at = idx === -1 ? clampIdx((get().orphanIdx ?? 0) - 1, list) : Math.max(idx - 1, 0);
     const prev = list[at];
     if (prev.id !== get().selectedId)
       set({
@@ -1099,6 +1103,12 @@ function reanchor(
           composerText: "",
           composerAttach: false,
           conversations: discardComposerHandoff(get().conversations, prev),
+          // R12: the draft sheet is a per-conversation MODAL — it must
+          // never survive a selection retarget it did not initiate. Below
+          // xl the palette is reachable over the sheet (R7 matrix), and a
+          // palette filter/sort/fold lands here: the sheet would silently
+          // swap to another conversation's draft.
+          draftSheetOpen: false,
         }
       : {}),
   });
@@ -1195,6 +1205,10 @@ function advanceSelection(
     orphanIdx: null,
     composerText: "",
     composerAttach: false,
+    // R12 (same invariant as reanchor): a retarget closes the sheet — the
+    // palette can run Mark done / Snooze over the open sheet, and the row
+    // leaving the view lands here.
+    draftSheetOpen: false,
     conversations: discardComposerHandoff(get().conversations, get().selectedId),
   });
 }
