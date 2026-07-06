@@ -319,7 +319,7 @@ function MessageBubble({ message: m, now }: { message: Message; now: number }) {
             : "border-border bg-card",
         )}
       >
-        <p className="text-foreground">{m.body}</p>
+        <p className="content-text text-foreground">{m.body}</p>
       </div>
     </div>
   );

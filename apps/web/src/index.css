@@ -213,6 +213,16 @@
   display: none;
 }
 
+/* R15: connector/user content is UNTRUSTED TEXT — preserve author newlines,
+   break long URLs/tokens. The ONE lens for every message-text renderer
+   (thread bubble, draft card, angle cards, studio chat). `anywhere` over
+   `break-word`: it also constrains min-content sizing, so a long token
+   can't stretch a flex bubble past its max-width. */
+.content-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Scrollbars — quiet, operator. */
 @layer base {
   * {

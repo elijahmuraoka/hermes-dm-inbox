@@ -516,7 +516,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       }));
-      advanceSelection(set, get, beforeIdx);
+      advanceSelection(set, get, beforeIdx, target);
     });
   },
 
@@ -544,7 +544,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       }));
-      advanceSelection(set, get, beforeIdx);
+      advanceSelection(set, get, beforeIdx, target);
     });
   },
 
@@ -609,7 +609,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           s.now,
         ),
       }));
-      advanceSelection(set, get, beforeIdx);
+      advanceSelection(set, get, beforeIdx, conv.id);
     });
   },
 
@@ -928,7 +928,14 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   focusComposer: () => {
     if (!get().selectedId) return;
-    set((s) => ({ mobilePane: "thread", composerFocusTick: s.composerFocusTick + 1 }));
+    // R15: clear the way like addToChat — the action moves to the composer,
+    // and a palette-over-sheet Reply otherwise landed focus BEHIND the
+    // still-open aria-modal (trap broken, command looked dead).
+    set((s) => ({
+      mobilePane: "thread",
+      draftSheetOpen: false,
+      composerFocusTick: s.composerFocusTick + 1,
+    }));
   },
 
   // v0 send = LOCAL MOCK append (code-level truth; the UI is diegetic).
@@ -1235,9 +1242,24 @@ function advanceSelection(
   set: (partial: Partial<InboxState>) => void,
   get: () => InboxState,
   beforeIdx: number,
+  targetId: string,
 ) {
   const after = get().visibleConversations();
-  if (after.some((c) => c.id === get().selectedId)) return;
+  if (after.some((c) => c.id === get().selectedId)) {
+    // R15: the row stayed visible (done in All, Sent + Show-done) so the
+    // selection holds — but the verdict still invalidates the buffer the
+    // same way it does when the row leaves: preserving a live handoff +
+    // stale text on a now-triaged thread let a later ⌘Enter send it and
+    // reopen the thread. SCOPED to the selected thread — a hover-Done on
+    // a DIFFERENT row must never clear the composer you are typing in.
+    if (targetId === get().selectedId)
+      set({
+        composerText: "",
+        composerAttach: false,
+        conversations: discardComposerHandoff(get().conversations, targetId),
+      });
+    return;
+  }
   // R10: a hidden-but-open thread (post-send routing strip) reaches here
   // with beforeIdx -1 — the caller couldn't find the row in the view. Fall
   // back to the recorded orphan slot, not row 0: the same M1 rule

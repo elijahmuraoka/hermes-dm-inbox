@@ -168,7 +168,7 @@ export function HermesDraftPanel({
                 <span className="text-[0.65625rem] font-semibold uppercase tracking-wider text-muted-foreground">
                   {ANGLE_LABEL[followup ? "followup" : "reply"][a.tone]}
                 </span>
-                <span className="text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
+                <span className="content-text text-[0.78125rem] leading-relaxed text-foreground">{a.text}</span>
               </span>
             </button>
           ))}
@@ -272,7 +272,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
         </div>
 
         {/* the active version — read-only; editing happens in the composer */}
-        <div className="rounded-lg border border-border bg-background/60 p-3 text-[0.8125rem] leading-relaxed text-foreground">
+        <div className="content-text rounded-lg border border-border bg-background/60 p-3 text-[0.8125rem] leading-relaxed text-foreground">
           {active?.text}
         </div>
 
@@ -280,7 +280,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
         {chat.map((m) =>
           m.role === "user" ? (
             <div key={m.id} className="flex justify-end">
-              <span className="max-w-[85%] rounded-lg rounded-br-sm bg-accent/70 px-2.5 py-1.5 text-[0.75rem] leading-snug text-foreground">
+              <span className="content-text max-w-[85%] rounded-lg rounded-br-sm bg-accent/70 px-2.5 py-1.5 text-[0.75rem] leading-snug text-foreground">
                 {m.text}
               </span>
             </div>
@@ -299,7 +299,7 @@ function Studio({ conversation: c }: { conversation: Conversation }) {
                 type="button"
                 onClick={() => m.versionId && setActiveVersion(m.versionId)}
                 className={cn(
-                  "max-w-[85%] rounded-lg rounded-bl-sm border px-2.5 py-1.5 text-left text-[0.75rem] leading-snug text-muted-foreground",
+                  "content-text max-w-[85%] rounded-lg rounded-bl-sm border px-2.5 py-1.5 text-left text-[0.75rem] leading-snug text-muted-foreground",
                   m.versionId ? "hover:text-foreground" : "cursor-default",
                 )}
                 style={{ borderColor: "color-mix(in oklch, var(--hermes) 25%, transparent)" }}
