@@ -395,10 +395,24 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       });
   },
 
-  selectId: (id) =>
+  selectId: (id) => {
+    // R11: under the Unread filter, READING the row removes it from the
+    // view while it stays selected — record where it sat as the orphan
+    // slot (the M1 rule advanceSelection gained in R10) instead of
+    // nulling, or the next j/k falls back to row 0. The vanish itself is
+    // deliberately instant (no exitingIds ride): reading is navigation,
+    // not triage — motion-causality reserves the exit animation for row
+    // verdicts, and the reader's attention is in the thread pane.
+    const willOrphan =
+      !!id &&
+      get().filters.unreadOnly &&
+      get().conversations.some((c) => c.id === id && c.unread);
+    const preIdx = willOrphan
+      ? get().visibleConversations().findIndex((c) => c.id === id)
+      : -1;
     set((s) => ({
       selectedId: id,
-      orphanIdx: null,
+      orphanIdx: willOrphan && preIdx !== -1 ? preIdx : null,
       mobilePane: "thread",
       // M2: selecting a thread reads it (reference-inbox behavior). Only
       // write conversations when something actually flips (M6 discipline).
@@ -408,11 +422,24 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           ? discardComposerHandoff(readOne(s.conversations, id), s.selectedId)
           : readOne(s.conversations, id),
       ...(id !== s.selectedId ? { composerText: "", composerAttach: false } : {}),
-    })),
+    }));
+  },
   openThread: () => {
     const id = get().selectedId;
     if (!id) return;
-    set((s) => ({ mobilePane: "thread", conversations: readOne(s.conversations, id) }));
+    // R11: Enter reads too — same read-orphan rule as selectId (j/k does
+    // NOT read, so this is the path that actually bites: filter on, j/k
+    // down, Enter to open, u back, j — was yanked to top).
+    const willOrphan =
+      get().filters.unreadOnly && get().conversations.some((c) => c.id === id && c.unread);
+    const preIdx = willOrphan
+      ? get().visibleConversations().findIndex((c) => c.id === id)
+      : -1;
+    set((s) => ({
+      mobilePane: "thread",
+      conversations: readOne(s.conversations, id),
+      ...(willOrphan && preIdx !== -1 ? { orphanIdx: preIdx } : {}),
+    }));
   },
   backToList: () => set({ mobilePane: "list", draftSheetOpen: false }),
   setPalette: (open) => set({ paletteOpen: open }),
