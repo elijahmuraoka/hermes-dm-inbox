@@ -70,7 +70,11 @@ interface InboxState {
   drawerOpen: boolean; // mobile (<md) hamburger drawer holding the view/source rail
   paletteOpen: boolean;
   shortcutsOpen: boolean;
-  draftingId: string | null; // conversation Hermes is generating for — per-thread, never global (#4)
+  // Conversations Hermes is generating for. A pending SET, not one slot (R5):
+  // draft on A, switch to B, draft on B overwrote A's marker, and A's panel
+  // fell back to the initial CTA whose click no-ops against the requested-
+  // guard — a dead control lying about in-flight work (#4's completion).
+  draftingIds: string[];
 
   // composer — the ONE editing surface (drafts are prefills, not editors)
   composerText: string;
@@ -234,7 +238,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   drawerOpen: false,
   paletteOpen: false,
   shortcutsOpen: false,
-  draftingId: null,
+  draftingIds: [],
   composerText: "",
   composerAttach: false,
   composerFocusTick: 0,
@@ -260,6 +264,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   },
 
   setView: (v) => {
+    // R5: re-entering the CURRENT view (g i while in Important, clicking the
+    // active rail item) is a no-op lens change — it keeps the UI side effects
+    // (close drawer/sheet, back to list) but must not yank a mid-list
+    // selection to row 0 or clear typed composer text. "keep" still anchors
+    // the first row when nothing is selected, so initial anchoring survives.
+    const same = v === get().activeView;
     // exitingIds cleared: an in-flight exit predicted against the OLD view
     // must not keep collapsing its row in the new one (review L4).
     set({
@@ -269,7 +279,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       drawerOpen: false,
       exitingIds: [],
     });
-    reanchor(set, get, "top");
+    reanchor(set, get, same ? "keep" : "top");
   },
 
   // Every filter mutation re-anchors selection on the first visible row —
@@ -282,7 +292,10 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   clearFilters: () => applyFilters(set, get, { ...NO_FILTERS }),
 
   // Sort override for the active view; selection re-anchors like a filter.
+  // R5 family sweep: the palette disables the active sort command, but the
+  // store guards the no-op anyway — an unchanged order never re-anchors.
   setSortMode: (mode) => {
+    if (get().sortModes[get().activeView] === mode) return;
     set((s) => ({ sortModes: { ...s.sortModes, [s.activeView]: mode } }));
     reanchor(set, get, "top");
   },
@@ -485,7 +498,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // Open the sheet too: below xl the side panel doesn't exist, and a state
     // mutation with no visible feedback is a contract violation.
     set((s) => ({
-      draftingId: conv.id,
+      draftingIds: [...s.draftingIds, conv.id],
       draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) =>
         c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
@@ -499,9 +512,9 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
     window.setTimeout(() => {
       set((s) => {
-        // Clear only OUR generation marker — a draft started on another
-        // thread in the meantime keeps its own spinner.
-        const clearSpin = { draftingId: s.draftingId === conv.id ? null : s.draftingId };
+        // Settle only OUR pending marker — drafts in flight on other threads
+        // (or a second op on this one) keep their own spinners.
+        const clearSpin = { draftingIds: removeOne(s.draftingIds, conv.id) };
         // R4-2: the async flip is only valid while the request still stands.
         // A send (draft terminalized), done (request canceled), or any other
         // status move during the window means these angles answer a moment
@@ -586,7 +599,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const userMsg: DraftChatMsg = { id: `${conv.id}ch${(conv.draft.chat?.length ?? 0) + 1}`, role: "user", text };
     // N2 class: every draft mutation opens its feedback surface (sheet <xl).
     set((s) => ({
-      draftingId: conv.id,
+      draftingIds: [...s.draftingIds, conv.id],
       draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) =>
         c.id === conv.id
@@ -596,7 +609,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }));
     window.setTimeout(() => {
       set((s) => {
-        const clearSpin = { draftingId: s.draftingId === conv.id ? null : s.draftingId };
+        const clearSpin = { draftingIds: removeOne(s.draftingIds, conv.id) };
         // R4 sweep (same rule as the angles timer): a send or reset during
         // the window supersedes the iteration — drop it. If the draft moved
         // to added_to_chat/edited meanwhile, the new version still joins the
@@ -861,6 +874,15 @@ function clampIdx(idx: number, list: Conversation[]): number {
   return Math.min(Math.max(idx, 0), list.length - 1);
 }
 
+// draftingIds is a multiset: request-over-iterate on the SAME thread holds two
+// pending ops (iterate on generated, then `d` re-requests), and the first
+// timer to settle must not clear the spinner the second still owns — so each
+// settle removes exactly ONE instance.
+function removeOne(ids: string[], id: string): string[] {
+  const i = ids.indexOf(id);
+  return i === -1 ? ids : [...ids.slice(0, i), ...ids.slice(i + 1)];
+}
+
 /** Mark one conversation read; returns the SAME array when nothing flips so
     no-op selections never churn identity (M2 + M6 discipline). */
 function readOne(conversations: Conversation[], id: string | null): Conversation[] {
@@ -891,14 +913,26 @@ function reanchor(
 }
 
 // Shared by every filter setter: merge the patch, then re-anchor selection.
+// R5: a no-op patch (clicking the active "All sources" rail item, clearing
+// already-clear filters) still closes the mobile surfaces but never touches
+// the filter object, the selection, or the composer — the lens didn't move,
+// so it must not cost user state (same family as setView's same-view guard).
 function applyFilters(
   set: (partial: Partial<InboxState>) => void,
   get: () => InboxState,
   patch: Partial<InboxFilters>,
 ) {
+  const cur = get().filters;
+  const changed = (Object.keys(patch) as (keyof InboxFilters)[]).some(
+    (k) => patch[k] !== cur[k],
+  );
+  if (!changed) {
+    set({ mobilePane: "list", drawerOpen: false });
+    return;
+  }
   // exitingIds cleared for the same reason as setView (review L4).
   set({
-    filters: { ...get().filters, ...patch },
+    filters: { ...cur, ...patch },
     mobilePane: "list",
     drawerOpen: false,
     exitingIds: [],

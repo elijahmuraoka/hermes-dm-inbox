@@ -52,10 +52,18 @@ export function population(
   return deriveVisible(conversations, view, filters, "default", false, null, now);
 }
 
-/** Sent's hidden-done tally, under the same filter lens as everything else —
-    "Show done (5)" must never reveal 1 row because a source chip was active. */
-export function sentDoneCount(conversations: Conversation[], filters: InboxFilters): number {
-  return conversations.filter((c) => isSentDone(c) && matchesFilters(c, filters)).length;
+/** Sent's hidden-done tally, under the same filter AND snooze lens as the
+    rows it vouches for — "Show done (5)" must never reveal fewer because a
+    source chip was active (H2) or a done row was snoozed away (R5: snooze
+    hides it from Sent via deriveVisible, so the count must not see it). */
+export function sentDoneCount(
+  conversations: Conversation[],
+  filters: InboxFilters,
+  now: number,
+): number {
+  return conversations.filter(
+    (c) => isSentDone(c) && !isSnoozed(c, now) && matchesFilters(c, filters),
+  ).length;
 }
 
 /** Per-view sort override. "default" = the specced order. */

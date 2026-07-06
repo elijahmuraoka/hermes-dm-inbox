@@ -48,7 +48,7 @@ export function HermesDraftPanel({
   conversation: Conversation;
   mode?: "side" | "sheet";
 }) {
-  const drafting = useInboxStore((s) => s.draftingId === c.id);
+  const drafting = useInboxStore((s) => s.draftingIds.includes(c.id));
   const requestDraft = useInboxStore((s) => s.requestDraft);
   const chooseAngle = useInboxStore((s) => s.chooseAngle);
   const setDraftSheet = useInboxStore((s) => s.setDraftSheet);
@@ -182,7 +182,7 @@ export function HermesDraftPanel({
 /** Version stepper + read-only card + refinement chat + Add to chat.
     No bare Regenerate: every re-generation goes through the chat with intent. */
 function Studio({ conversation: c }: { conversation: Conversation }) {
-  const drafting = useInboxStore((s) => s.draftingId === c.id);
+  const drafting = useInboxStore((s) => s.draftingIds.includes(c.id));
   const iterateDraft = useInboxStore((s) => s.iterateDraft);
   const setActiveVersion = useInboxStore((s) => s.setActiveVersion);
   const addToChat = useInboxStore((s) => s.addToChat);

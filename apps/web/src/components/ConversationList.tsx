@@ -53,8 +53,8 @@ export function ConversationList() {
   // Sent's hidden-done tally — same filter lens as everything else (H2:
   // "Show done (5)" must never reveal 1 row because a source chip is active).
   const doneCount = useMemo(
-    () => (activeView === "sent" ? sentDoneCount(conversations, filters) : 0),
-    [conversations, activeView, filters],
+    () => (activeView === "sent" ? sentDoneCount(conversations, filters, now) : 0),
+    [conversations, activeView, filters, now],
   );
 
   // Group headers only in the default order — an override flattens (v5/v6).
