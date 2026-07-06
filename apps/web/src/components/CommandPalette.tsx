@@ -100,6 +100,13 @@ export function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        // R16: this listener lives outside the useKeyboard dispatch, so it
+        // must consult the modal stack itself. The shortcut sheet is the one
+        // hotkeys-OFF modal (`/` is swallowed there too) — opening the
+        // palette UNDER it stole focus behind an aria-modal and fed the next
+        // Esc to the hidden layer. Sheet/drawer deliberately stack below the
+        // palette (R7 matrix) and stay reachable.
+        if (useInboxStore.getState().shortcutsOpen) return;
         e.preventDefault();
         setPalette(!useInboxStore.getState().paletteOpen);
       }

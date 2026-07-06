@@ -22,6 +22,7 @@ import {
   NO_FILTERS,
   deriveVisible,
   isFollowupShaped,
+  isSnoozed,
   type CollapsedSections,
   type InboxFilters,
   type SectionKey,
@@ -214,14 +215,36 @@ function cancelPendingDraft(d: Draft): Draft {
 // history, and the thread has moved on. The receipt pins activeVersionId
 // to the version ACTUALLY handed over, so the panel shows what was sent
 // even if the stepper browsed elsewhere after the add.
-function draftAfterSend(d: Draft): Draft {
-  if (d.status === "added_to_chat" || d.status === "edited")
+function draftAfterSend(d: Draft, convId: string, sentText: string, now: number): Draft {
+  if (d.status === "added_to_chat")
     return {
       ...d,
       status: "sent_mock" as const,
       angles: undefined,
       activeVersionId: d.handedVersionId ?? d.activeVersionId,
     };
+  if (d.status === "edited") {
+    // R16: receipt truth one level deeper — an EDITED send delivers the
+    // composer text, not the handed version. The receipt records the FINAL
+    // SENT BODY as its own version (edit noted), so the panel never labels
+    // pre-edit text "Sent".
+    const vid = `${convId}d${d.versions.length + 1}`;
+    return {
+      ...d,
+      status: "sent_mock" as const,
+      angles: undefined,
+      versions: [
+        ...d.versions,
+        {
+          id: vid,
+          createdAt: new Date(now).toISOString(),
+          instructions: "Edited in composer before sending",
+          text: sentText,
+        },
+      ],
+      activeVersionId: vid,
+    };
+  }
   if (d.status === "not_started") return d;
   return { status: "not_started" as const, versions: [] };
 }
@@ -478,6 +501,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!target || get().exitingIds.includes(target)) return;
     const conv = get().conversations.find((c) => c.id === target);
     if (!conv) return;
+    // R16: done → done is a no-op at the STORE, so every call site (e, the
+    // header button, row actions — the palette already disables) shares the
+    // guard: re-entry wrote a duplicate triage.done audit event and, since
+    // R15, cleared the composer for nothing. fyi → done stays valid (ack).
+    if (conv.status === "done") return;
     // On an FYI thread, `e` is an ACKNOWLEDGE (v6): same done transition —
     // it leaves Important and lives on in All — but the audit trail keeps
     // the distinction between clearing info and closing a conversation.
@@ -526,6 +554,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
   snooze: (id) => {
     const target = id ?? get().selectedId;
     if (!target || get().exitingIds.includes(target)) return;
+    // R16 sweep (same rule as markDone's done→done): re-snoozing an active
+    // snooze is a no-op under the fixed mock clock — identical snoozedUntil,
+    // duplicate audit event, and an R15 composer clear for nothing.
+    // Phase-1 note: with a REAL clock this becomes a legitimate extend —
+    // revisit the guard to compare values instead of blanket no-op.
+    const cur = get().conversations.find((c) => c.id === target);
+    if (!cur || isSnoozed(cur, get().now)) return;
     const beforeIdx = get()
       .visibleConversations()
       .findIndex((c) => c.id === target);
@@ -978,7 +1013,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             status: "sent" as const,
             unread: false,
             lastActivity: new Date(get().now).toISOString(),
-            draft: draftAfterSend(c.draft),
+            draft: draftAfterSend(c.draft, c.id, text, get().now),
           }
         : c,
     );
@@ -1018,7 +1053,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             // lineage (the composer actually carried the draft); unused
             // work — generated/iterated cards the user typed past, or a
             // pending request — resets clean. Timers skip via R8 tokens.
-            draft: draftAfterSend(c.draft),
+            draft: draftAfterSend(c.draft, c.id, text, s.now),
           };
         }),
         audit: pushAudit(
