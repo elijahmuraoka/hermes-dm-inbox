@@ -16,7 +16,7 @@ Read this before assuming anything works.
 
 - `main` is minimal: this README, the license and community files, and a package manifest. There is no application code on `main` yet.
 - **Phase 0** is a pure frontend web slice, currently under review in [PR #1](https://github.com/elijahmuraoka/hermes-dm-inbox/pull/1) on the `feat/hermes-dm-inbox-phase-0-web-slice` branch. It is a React + Vite + TypeScript + Tailwind app driven entirely by mock fixture data: the full inbox UI, the keyboard system, and the Hermes drafting studio. There is no backend and there are **no real platform integrations**. Sends are local-only; nothing is delivered anywhere.
-- Later phases add the real backend and the platform connectors (iMessage, LinkedIn, X, and likely email). None of that exists yet.
+- Later phases add the real backend and the platform connectors (iMessage, LinkedIn, X, and future DM-shaped channels). Email is deliberately deferred until the DM model is proven; it is not DM-shaped. None of that exists yet.
 
 If you are evaluating whether this can read your actual DMs today: it cannot.
 
@@ -53,7 +53,7 @@ The core map (press `?` inside the app for the full sheet):
 | `d` | Draft with Hermes (returns three angled candidates) |
 | `1` / `2` / `3` | Pick an angle |
 | `r` | Refine: focus the studio chat |
-| `e` | Add the picked draft to the composer; otherwise mark done |
+| `e` | Add the picked draft to the composer; with no draft in play, mark done (deliberate no-op mid-draft) |
 | `s` | Snooze |
 | `/` | Open the command palette |
 | `?` | Shortcut sheet |
