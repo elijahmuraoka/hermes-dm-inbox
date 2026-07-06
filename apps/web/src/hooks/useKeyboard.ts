@@ -38,6 +38,18 @@ export function useKeyboard() {
       if (gTimer.current) window.clearTimeout(gTimer.current);
     };
 
+    // R19: j/k make the interaction intent unambiguous — the STORE owns the
+    // selection now. If DOM focus is still parked on a conversation row (or
+    // its hover actions) from an earlier click, ROVE it off: the R10 Enter
+    // bypass would otherwise let the browser re-activate the OLD row and
+    // yank the selection back. Real controls (Retry, chips, toggles) keep
+    // focus — rows are app-managed selection surfaces, not generic controls.
+    // Tab-to-row + Enter still activates natively (no j/k involved).
+    const blurRowFocus = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (el?.closest?.("[data-conv-row]")) el.blur();
+    };
+
     const onKey = (e: KeyboardEvent) => {
       const st = s();
 
@@ -109,9 +121,11 @@ export function useKeyboard() {
           return;
         case "j":
           e.preventDefault();
+          blurRowFocus(e.target);
           return void st.selectNext();
         case "k":
           e.preventDefault();
+          blurRowFocus(e.target);
           return void st.selectPrev();
         case "Enter": {
           // R10 (a11y): a keyboard user may have TABbed onto a real control —

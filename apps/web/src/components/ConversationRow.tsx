@@ -58,6 +58,9 @@ function ConversationRowImpl({ conversation: c, view, selected, exiting, now }: 
 
   return (
     <div
+      // R19: marks the row (and its hover actions) as an app-managed
+      // selection surface — j/k rove stale DOM focus off anything inside.
+      data-conv-row=""
       className={cn(
         "group relative border-b border-border/60",
         "transition-colors duration-[120ms] ease-[var(--ease-house)]",

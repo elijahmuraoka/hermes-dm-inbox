@@ -100,6 +100,11 @@ export function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        // R19: CLAIM the shortcut before consulting the stack — R16's guard
+        // returned pre-preventDefault, so with the sheet open ⌘K fell
+        // through to the BROWSER (address bar). The modal suppresses the
+        // toggle, never the app's ownership of the key.
+        e.preventDefault();
         // R16: this listener lives outside the useKeyboard dispatch, so it
         // must consult the modal stack itself. The shortcut sheet is the one
         // hotkeys-OFF modal (`/` is swallowed there too) — opening the
@@ -107,7 +112,6 @@ export function CommandPalette() {
         // Esc to the hidden layer. Sheet/drawer deliberately stack below the
         // palette (R7 matrix) and stay reachable.
         if (useInboxStore.getState().shortcutsOpen) return;
-        e.preventDefault();
         setPalette(!useInboxStore.getState().paletteOpen);
       }
     };
