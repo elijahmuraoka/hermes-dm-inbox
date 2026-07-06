@@ -21,6 +21,7 @@ import {
   DEFAULT_SORTS,
   NO_FILTERS,
   deriveVisible,
+  isFollowupShaped,
   type CollapsedSections,
   type InboxFilters,
   type SectionKey,
@@ -205,6 +206,26 @@ function cancelPendingDraft(d: Draft): Draft {
   };
 }
 
+// R14: the terminal state must be TRUE. A receipt (sent_mock) exists only
+// when the composer was populated FROM the draft (added_to_chat/edited
+// lineage) — a manual send over an unused draft must not display Hermes
+// text as Sent (misattribution) or block the fresh-draft mouse path.
+// Unused work is superseded: reset clean — the audit trail keeps the
+// history, and the thread has moved on. The receipt pins activeVersionId
+// to the version ACTUALLY handed over, so the panel shows what was sent
+// even if the stepper browsed elsewhere after the add.
+function draftAfterSend(d: Draft): Draft {
+  if (d.status === "added_to_chat" || d.status === "edited")
+    return {
+      ...d,
+      status: "sent_mock" as const,
+      angles: undefined,
+      activeVersionId: d.handedVersionId ?? d.activeVersionId,
+    };
+  if (d.status === "not_started") return d;
+  return { status: "not_started" as const, versions: [] };
+}
+
 // R7: leaving a thread discards its composer buffer (per-thread integrity),
 // so the outgoing thread's draft lifecycle must stop claiming the composer
 // holds it. added_to_chat/edited revert to the standing card the versions
@@ -226,6 +247,7 @@ function discardComposerHandoff(
           draft: {
             ...x.draft,
             status: x.draft.versions.length > 1 ? ("iterated" as const) : ("generated" as const),
+            handedVersionId: undefined, // R14: the handoff is discarded with the buffer
           },
         }
       : x,
@@ -840,7 +862,15 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       draftSheetOpen: false, // the action moves to the composer; clear the way
       mobilePane: "thread",
       conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "added_to_chat" } } : c,
+        c.id === conv.id
+          ? {
+              ...c,
+              // R14: record WHICH version was copied — attribution
+              // (divergence base + receipt) keys off it, so the stepper
+              // stays free to browse without corrupting send truth.
+              draft: { ...c.draft, status: "added_to_chat", handedVersionId: version.id },
+            }
+          : c,
       ),
       audit: pushAudit(
         s.audit,
@@ -852,13 +882,18 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   setComposerText: (text) => {
     const conv = get().selected();
-    const active = conv?.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    // R14: divergence compares against the HANDED version — the stepper may
+    // have moved activeVersionId since the add, and the wrong base either
+    // missed real edits or flagged phantom ones.
+    const base = conv?.draft.versions.find(
+      (v) => v.id === (conv.draft.handedVersionId ?? conv.draft.activeVersionId),
+    );
     // Hermes-originated prefill that diverges from the draft → status "edited".
     // M6: flip exactly ONCE, on the added_to_chat → edited transition —
     // rewriting the conversations array per keystroke was a render storm.
     // "edited" never flips back: send attribution only needs "did it diverge".
     const diverged =
-      conv && active && conv.draft.status === "added_to_chat" && text !== active.text;
+      conv && base && conv.draft.status === "added_to_chat" && text !== base.text;
     set((s) => ({
       composerText: text,
       conversations: diverged
@@ -905,10 +940,15 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const conv = get().selected();
     const text = get().composerText.trim();
     if (!conv || !text || get().exitingIds.includes(conv.id)) return;
-    const active = conv.draft.versions.find((v) => v.id === conv.draft.activeVersionId);
+    // R14: attribution keys off the HANDED version, never the stepper's
+    // pointer — browsing versions after add-to-chat must not change what
+    // "sent from Hermes" means.
+    const handed = conv.draft.versions.find(
+      (v) => v.id === (conv.draft.handedVersionId ?? conv.draft.activeVersionId),
+    );
     const fromHermes =
       conv.draft.status === "added_to_chat" ||
-      (conv.draft.status === "edited" && !!active);
+      (conv.draft.status === "edited" && !!handed);
     const routed = suggestPostSend(text);
     // M1: remember where the row sat — post-send the selection deliberately
     // stays on this thread (routing strip), so when the row leaves the view
@@ -923,6 +963,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // R6 sweep: the prediction must terminalize the draft the way the commit
     // does — hasDraft flips false on send, and under an active has-draft
     // filter a stays-prediction let the row pop out with no exit animation.
+    // R14: both sides now share draftAfterSend so they can never diverge.
     const predicted = get().conversations.map((c) =>
       c.id === conv.id
         ? {
@@ -930,12 +971,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             status: "sent" as const,
             unread: false,
             lastActivity: new Date(get().now).toISOString(),
-            draft:
-              c.draft.status === "not_started"
-                ? c.draft
-                : c.draft.versions.length === 0
-                  ? { ...c.draft, status: "not_started" as const, angles: undefined }
-                  : { ...c.draft, status: "sent_mock" as const, angles: undefined },
+            draft: draftAfterSend(c.draft),
           }
         : c,
     );
@@ -970,16 +1006,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
             ],
             // R4-1: a send supersedes ANY standing draft, not just the one it
             // came from — a live Draft chip + add-to-chat offering an
-            // obsolete reply after a manual send was a lie. Versions produced
-            // become a sent receipt; a request/angles with no versions yet
-            // resets clean (nothing real was lost; d starts fresh). Pending
-            // angles die here, and the async timers skip (R4-2 guards).
-            draft:
-              c.draft.status === "not_started"
-                ? c.draft
-                : c.draft.versions.length === 0
-                  ? { ...c.draft, status: "not_started" as const, angles: undefined }
-                  : { ...c.draft, status: "sent_mock" as const, angles: undefined },
+            // obsolete reply after a manual send was a lie. R14 sharpens the
+            // terminal state: a RECEIPT only for added_to_chat/edited
+            // lineage (the composer actually carried the draft); unused
+            // work — generated/iterated cards the user typed past, or a
+            // pending request — resets clean. Timers skip via R8 tokens.
+            draft: draftAfterSend(c.draft),
           };
         }),
         audit: pushAudit(
@@ -1286,7 +1318,10 @@ const NUDGE_FALLBACK: AngleSet = {
 
 function anglesFor(conv: Conversation): AngleSet {
   const lastMsg = conv.messages[conv.messages.length - 1];
-  if (conv.status === "sent") {
+  // R14: followup-SHAPED, not just status sent — a done row whose last word
+  // was yours (Sent's Show-done) is definitionally a chase; reply angles
+  // against no incoming message were the generic fallback lying.
+  if (isFollowupShaped(conv)) {
     // Chasing, not answering: key follow-ups off YOUR last outgoing message.
     return (
       MOCK_NUDGE_SETS[conv.id] ??

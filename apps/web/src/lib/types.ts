@@ -84,6 +84,11 @@ export interface Draft {
   angles?: DraftAngle[]; // present while status === "angles_ready"
   versions: DraftVersion[];
   activeVersionId?: string;
+  // R14: the version actually COPIED to the composer at add-to-chat. Send
+  // attribution (receipt + divergence base) keys off this, never off
+  // activeVersionId — the stepper stays free to browse without corrupting
+  // what "sent from Hermes" means.
+  handedVersionId?: string;
   chat?: DraftChatMsg[]; // the studio conversation (instruction history)
 }
 

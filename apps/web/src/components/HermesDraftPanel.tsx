@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Conversation, DraftStatus } from "@/lib/types";
+import { isFollowupShaped } from "@/lib/derive";
 import { useInboxStore, QUICK_CHIPS } from "@/hooks/useInboxStore";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,9 @@ export function HermesDraftPanel({
   const draft = c.draft;
   const hasVersion = draft.versions.length > 0;
   const anglesPending = draft.status === "angles_ready" && !!draft.angles;
-  const followup = c.status === "sent"; // drafting here means chasing
+  // R14: followup-SHAPED — done rows whose last word was yours (Sent's
+  // Show-done) chase too; reply labels against no incoming message lied.
+  const followup = isFollowupShaped(c);
 
   const lifecycleLabel =
     draft.status === "iterated"

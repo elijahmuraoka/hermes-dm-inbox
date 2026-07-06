@@ -105,6 +105,14 @@ export function isSentDone(c: Conversation): boolean {
   return c.status === "done" && c.messages[c.messages.length - 1]?.direction === "out";
 }
 
+/** R14: drafting on a last-word-yours thread is CHASING, whether the thread
+    is open (sent) or closed (done, last outgoing) — Sent's Show-done rows
+    must get follow-up angles/labels, not reply angles against no incoming
+    message. One key for every followup-shaped surface (panel, angles, CTA). */
+export function isFollowupShaped(c: Conversation): boolean {
+  return c.status === "sent" || isSentDone(c);
+}
+
 /** Which Sent section a row belongs to (drives the group headers). */
 export function sentGroup(c: Conversation, now: number): "followup" | "awaiting" | "done" {
   if (c.status === "done") return "done";
