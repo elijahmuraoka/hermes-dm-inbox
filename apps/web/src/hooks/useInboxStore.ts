@@ -529,12 +529,15 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const predicted = get().conversations.map((c) =>
       c.id === target ? { ...c, status: "done" as const, unread: false } : c,
     );
+    // R8/R18: the supersede DECISION is made NOW, so the token dies NOW —
+    // invalidating inside the EXIT_MS-delayed commit left a ~150ms window
+    // where the mock timer still owned a valid token and wrote angles + an
+    // audit event for a request the user had already superseded. The
+    // captured count settles the marker in the commit; a timer firing
+    // inside the window gets settleDraftOp === false and does NOTHING.
+    // Iterate ops keep running: typed intent still lands in the stepper.
+    const canceledReq = cancelDraftOps(target, "request");
     exitThenCommit(set, get, target, predicted, () => {
-      // R8: canceling the pending REQUEST also settles its spinner marker and
-      // invalidates its timer — the token is what keeps that timer from
-      // completing a later request. Iterate ops keep running: typed intent
-      // still lands in the stepper, so their spinner stays honest.
-      const canceledReq = cancelDraftOps(target, "request");
       set((s) => ({
         draftingIds: removeN(s.draftingIds, target, canceledReq),
         conversations: s.conversations.map((c) =>
@@ -629,10 +632,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const predicted = get().conversations.map((c) =>
       c.id === conv.id ? { ...c, status: next } : c,
     );
+    // R8/R18: same pairing as markDone — and the token dies at ACTION time,
+    // not in the delayed commit (the ~150ms exit window let a firing timer
+    // complete a request the flip had already superseded).
+    const canceledReq = next === "done" ? cancelDraftOps(conv.id, "request") : 0;
     exitThenCommit(set, get, conv.id, predicted, () => {
-      // R8: same pairing as markDone — the done direction settles the
-      // canceled request's marker and invalidates its timer token.
-      const canceledReq = next === "done" ? cancelDraftOps(conv.id, "request") : 0;
       set((s) => ({
         draftingIds: removeN(s.draftingIds, conv.id, canceledReq),
         conversations: s.conversations.map((c) =>
@@ -1027,11 +1031,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
           }
         : c,
     );
+    // R8/R18: R4-1's supersede is total — request AND iterate tokens die at
+    // the SEND, not in the delayed commit (both content guards would drop
+    // the results anyway; the tokens close the ~150ms exit-window race and
+    // the captured count settles the markers in the commit).
+    const canceledOps = cancelDraftOps(conv.id);
     exitThenCommit(set, get, conv.id, predicted, () => {
-      // R8: R4-1's supersede is total — request AND iterate timers die here
-      // (both guards would drop their content anyway; now their markers
-      // settle at the send instead of lingering until the timers fire).
-      const canceledOps = cancelDraftOps(conv.id);
       set((s) => {
       const nowIso = new Date(s.now).toISOString();
       return {
