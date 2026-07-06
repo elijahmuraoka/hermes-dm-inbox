@@ -12,9 +12,13 @@ import { XL_QUERY } from "@/lib/constants";
 //      OFF (R3: a true modal must not let e/s/d/j/k mutate state invisibly
 //      behind it; Esc is handled above).
 //   3. Typing targets → no hotkeys.
-//   4. Pending `g` chord → consume the key WHATEVER it is (a failed chord
+//   4. Draft sheet visibly open (<xl) → only its own draft-flow keys pass
+//      (R7: it is aria-modal like the other three, and j/k retargeted the
+//      selection BEHIND it — the sheet follows selectedId). Drawer open →
+//      only view chords and overlay keys pass (pure nav surface).
+//   5. Pending `g` chord → consume the key WHATEVER it is (a failed chord
 //      must not fall through: `g e` archiving a thread was a live defect).
-//   5. Contextual keys (`e` respects the draft lifecycle) → plain hotkeys.
+//   6. Contextual keys (`e` respects the draft lifecycle) → plain hotkeys.
 export function useKeyboard() {
   const gPending = useRef(false);
   const gTimer = useRef<number | null>(null);
@@ -56,6 +60,32 @@ export function useKeyboard() {
       if (st.shortcutsOpen) return; // R3: no invisible mutations behind the ? modal
       if (isTyping(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // R7: aria-modal must mean it for KEYS, not just focus. While the
+      // draft sheet is visibly open (same <xl condition as its Esc arm),
+      // only keys serving the sheet's own draft flow stay live — everything
+      // list-level is swallowed (j/k retargeted selectedId behind the modal
+      // and the sheet follows the selection; s/p/e mutated hidden rows).
+      // Native activation (Enter/Space on the focused control) still works:
+      // swallowing skips the app handler without preventDefault.
+      if (st.draftSheetOpen && !window.matchMedia(XL_QUERY).matches) {
+        const ds = st.selected()?.draft.status;
+        const live =
+          e.key === "1" || e.key === "2" || e.key === "3" || // angle pick
+          e.key === "r" || // refine — focus the studio chat
+          e.key === "d" || // legitimate re-draft (the store guards the rest)
+          e.key === "u" || // backToList also closes the sheet — a visible exit
+          e.key === "/" || e.key === "?" || // palette/help stack ABOVE the sheet
+          (e.key === "e" && (ds === "generated" || ds === "iterated")); // add to chat only
+        if (!live) return; // j/k s p c Enter g-chords e-as-markDone: swallowed
+      }
+      // The drawer (the fourth aria-modal) is pure navigation: view chords
+      // pass (setView closes it — a visible outcome), overlays stack above;
+      // list mutations behind it are swallowed like the sheet's.
+      if (st.drawerOpen) {
+        const live = e.key === "g" || gPending.current || e.key === "/" || e.key === "?";
+        if (!live) return;
+      }
 
       // g-prefix combos — the three views (v6): g i / g s / g a
       if (gPending.current) {

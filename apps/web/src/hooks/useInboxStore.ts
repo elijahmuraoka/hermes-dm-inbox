@@ -205,6 +205,33 @@ function cancelPendingDraft(d: Draft): Draft {
   };
 }
 
+// R7: leaving a thread discards its composer buffer (per-thread integrity),
+// so the outgoing thread's draft lifecycle must stop claiming the composer
+// holds it. added_to_chat/edited revert to the standing card the versions
+// imply — edited otherwise dead-ends: the studio chat stays locked against
+// a composer that is now empty, `e` no-ops, and requestDraft is guarded.
+// Versions, activeVersionId, and the chat log all stay — they're real work.
+function discardComposerHandoff(
+  conversations: Conversation[],
+  outgoingId: string | null,
+): Conversation[] {
+  if (!outgoingId) return conversations;
+  const c = conversations.find((x) => x.id === outgoingId);
+  const ds = c?.draft.status;
+  if (ds !== "added_to_chat" && ds !== "edited") return conversations;
+  return conversations.map((x) =>
+    x.id === outgoingId
+      ? {
+          ...x,
+          draft: {
+            ...x.draft,
+            status: x.draft.versions.length > 1 ? ("iterated" as const) : ("generated" as const),
+          },
+        }
+      : x,
+  );
+}
+
 // Post-send suggestion (v5 final): sending always lands the thread in Sent
 // (open) — Hermes only SUGGESTS done-vs-open. Asks win when both appear
 // ("Thanks! Can you…?" stays open).
@@ -341,8 +368,15 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const at = idx === -1 ? clampIdx(get().orphanIdx ?? 0, list) : Math.min(idx + 1, list.length - 1);
     const next = list[at];
     // Composer is per-thread: never let text bleed across conversations.
+    // Leaving reconciles the outgoing thread's handoff draft (R7).
     if (next.id !== get().selectedId)
-      set({ selectedId: next.id, orphanIdx: null, composerText: "", composerAttach: false });
+      set({
+        selectedId: next.id,
+        orphanIdx: null,
+        composerText: "",
+        composerAttach: false,
+        conversations: discardComposerHandoff(get().conversations, get().selectedId),
+      });
   },
 
   selectPrev: () => {
@@ -352,7 +386,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const at = idx === -1 ? clampIdx(get().orphanIdx ?? 0, list) : Math.max(idx - 1, 0);
     const prev = list[at];
     if (prev.id !== get().selectedId)
-      set({ selectedId: prev.id, orphanIdx: null, composerText: "", composerAttach: false });
+      set({
+        selectedId: prev.id,
+        orphanIdx: null,
+        composerText: "",
+        composerAttach: false,
+        conversations: discardComposerHandoff(get().conversations, get().selectedId),
+      });
   },
 
   selectId: (id) =>
@@ -362,7 +402,11 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       mobilePane: "thread",
       // M2: selecting a thread reads it (reference-inbox behavior). Only
       // write conversations when something actually flips (M6 discipline).
-      conversations: readOne(s.conversations, id),
+      // On a real move, also reconcile the OUTGOING thread's handoff (R7).
+      conversations:
+        id !== s.selectedId
+          ? discardComposerHandoff(readOne(s.conversations, id), s.selectedId)
+          : readOne(s.conversations, id),
       ...(id !== s.selectedId ? { composerText: "", composerAttach: false } : {}),
     })),
   openThread: () => {
@@ -484,7 +528,17 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     exitThenCommit(set, get, conv.id, predicted, () => {
       set((s) => ({
         conversations: s.conversations.map((c) =>
-          c.id === conv.id ? { ...c, status: next } : c,
+          c.id === conv.id
+            ? {
+                ...c,
+                status: next,
+                // R7: done is done — same rule as markDone. A pending request
+                // otherwise survived the flip (the angles timer only checks
+                // draft.status) and landed angles on a closed thread. Reopen
+                // leaves the draft untouched.
+                draft: next === "done" ? cancelPendingDraft(c.draft) : c.draft,
+              }
+            : c,
         ),
         audit: pushAudit(
           s.audit,
@@ -938,7 +992,13 @@ function reanchor(
   set({
     selectedId: next,
     orphanIdx: null,
-    ...(next !== prev ? { composerText: "", composerAttach: false } : {}),
+    ...(next !== prev
+      ? {
+          composerText: "",
+          composerAttach: false,
+          conversations: discardComposerHandoff(get().conversations, prev),
+        }
+      : {}),
   });
 }
 
@@ -1020,8 +1080,16 @@ function advanceSelection(
   const after = get().visibleConversations();
   if (after.some((c) => c.id === get().selectedId)) return;
   const next = after[clampIdx(beforeIdx, after)] ?? null;
-  // Composer is per-thread: a selection move clears it, same as j/k.
-  set({ selectedId: next?.id ?? null, orphanIdx: null, composerText: "", composerAttach: false });
+  // Composer is per-thread: a selection move clears it, same as j/k — and
+  // the departing thread's handoff draft reconciles the same way (R7): a
+  // done/snoozed thread must not keep claiming an emptied composer.
+  set({
+    selectedId: next?.id ?? null,
+    orphanIdx: null,
+    composerText: "",
+    composerAttach: false,
+    conversations: discardComposerHandoff(get().conversations, get().selectedId),
+  });
 }
 
 // ── mock Hermes text (clearly illustrative; honesty guardrail) ──────────────

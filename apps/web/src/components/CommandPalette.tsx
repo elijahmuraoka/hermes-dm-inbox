@@ -278,7 +278,14 @@ export function CommandPalette() {
         keys: "d",
         icon: HermesMark,
         run: withClose(() => requestDraft()),
-        disabled: !selected,
+        // R7 (mirrors the store's M7 guard, like add-to-chat below): no
+        // re-request over an in-flight request or a composer handoff — the
+        // item was enabled while requestDraft would silently no-op.
+        disabled:
+          !selected ||
+          ["requested", "angles_ready", "added_to_chat", "edited"].includes(
+            selected.draft.status,
+          ),
       },
       {
         id: "draft-add-to-chat",
