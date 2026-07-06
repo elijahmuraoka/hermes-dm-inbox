@@ -613,7 +613,22 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       draftingIds: [...s.draftingIds, conv.id],
       draftSheetOpen: belowXl() ? true : s.draftSheetOpen,
       conversations: s.conversations.map((c) =>
-        c.id === conv.id ? { ...c, draft: { ...c.draft, status: "requested" } } : c,
+        c.id === conv.id
+          ? {
+              ...c,
+              // R13: terminal means terminal — a re-draft FROM a sent
+              // receipt starts CLEAN. Spreading the receipt forward kept
+              // the sent version selectable in the stepper (step back +
+              // add-to-chat = double-send bait), and a cancel resurrected
+              // it as a live card. The sent text lives in the thread and
+              // the audit trail, not the studio. Live generated/iterated
+              // re-drafts keep their version history by design (R4).
+              draft:
+                c.draft.status === "sent_mock"
+                  ? { status: "requested" as const, versions: [] }
+                  : { ...c.draft, status: "requested" as const },
+            }
+          : c,
       ),
       audit: pushAudit(
         s.audit,

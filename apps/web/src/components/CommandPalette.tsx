@@ -138,7 +138,10 @@ export function CommandPalette() {
       // NOTE: no "Sync" commands yet — sync doesn't exist in the mock slice, and a
       // no-op command would be a fake affordance (honesty guardrail).
       // Filter — filters bite on every view (v5)
-      { id: "flt-all", label: "Filter: all sources", group: "Filter", scope: "source", icon: Filter, run: withClose(() => setSource("all")) },
+      // R13 sweep: the ACTIVE source is a dead affordance — the store's
+      // no-op guard (R5) makes it costless, but a command that does nothing
+      // shows disabled (same family as the sort commands).
+      { id: "flt-all", label: "Filter: all sources", group: "Filter", scope: "source", icon: Filter, run: withClose(() => setSource("all")), disabled: filters.source === "all" },
       ...(Object.keys(SOURCE_META) as SourceId[]).map((s) => ({
         id: `flt-${s}`,
         label: `Filter: ${SOURCE_META[s].label}`,
@@ -146,6 +149,7 @@ export function CommandPalette() {
         scope: "source" as Scope,
         icon: Filter,
         run: withClose(() => setSource(s)),
+        disabled: filters.source === s,
       })),
       {
         id: "flt-unread",
@@ -221,13 +225,20 @@ export function CommandPalette() {
         run: withClose(() => toggleShowDone()),
       },
       // Section folds for the ACTIVE view (v7) — the headers are the mouse path.
+      // R13: folds only bite in the default (grouped) order — under a flat
+      // override the command did nothing visible, then surprise-hid rows
+      // when default sort returned. Honest label + disabled (same pattern
+      // as the sort commands above).
       ...(SECTION_COMMANDS[activeView] ?? []).map(({ key, label }) => ({
         id: `fold-${key}`,
-        label: `${VIEW_META[activeView].label} view: ${collapsed[key] ? "expand" : "collapse"} ${label}`,
+        label:
+          `${VIEW_META[activeView].label} view: ${collapsed[key] ? "expand" : "collapse"} ${label}` +
+          (sortModes[activeView] !== "default" ? " (default sort only)" : ""),
         group: "Filter",
         scope: "global" as Scope,
         icon: Filter,
         run: withClose(() => toggleSection(key)),
+        disabled: sortModes[activeView] !== "default",
       })),
       // Triage
       {
@@ -242,7 +253,9 @@ export function CommandPalette() {
         keys: "e",
         icon: Check,
         run: withClose(() => markDone()),
-        disabled: !selected,
+        // R13 sweep: re-marking a done thread only churns state + writes a
+        // second audit event claiming a transition that didn't happen.
+        disabled: !selected || selected.status === "done",
       },
       {
         id: "triage-snooze",
