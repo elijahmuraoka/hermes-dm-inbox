@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useInboxStore } from "@/hooks/useInboxStore";
-import { XL_QUERY } from "@/lib/constants";
+import { MD_QUERY, XL_QUERY } from "@/lib/constants";
 
 // Keyboard is the product, not polish. Global handler with a small `g`-prefix
 // state machine. Ignores typing targets and defers ⌘K to the palette itself.
@@ -48,7 +48,10 @@ export function useKeyboard() {
         // themselves) — never blur AND close the sheet underneath.
         if (isTyping(e.target)) return;
         if (st.shortcutsOpen) st.setShortcuts(false);
-        else if (st.drawerOpen) st.setDrawer(false);
+        // R9: the drawer only exists below md — Esc must never burn a press
+        // on an invisible layer (same rule as the sheet arm below; the
+        // DrawerAutoClose in App makes this state near-impossible, belt only).
+        else if (st.drawerOpen && !window.matchMedia(MD_QUERY).matches) st.setDrawer(false);
         // The sheet only exists below xl — at desktop the studio is the side
         // panel and the sheet state is dormant; Esc must never burn a press
         // on an invisible layer (pressure-test nit).
@@ -81,8 +84,10 @@ export function useKeyboard() {
       }
       // The drawer (the fourth aria-modal) is pure navigation: view chords
       // pass (setView closes it — a visible outcome), overlays stack above;
-      // list mutations behind it are swallowed like the sheet's.
-      if (st.drawerOpen) {
+      // list mutations behind it are swallowed like the sheet's. R9: gate on
+      // VISIBILITY (md:hidden), not bare state — a stale flag above md was
+      // silently swallowing desktop keys (DrawerAutoClose is primary; belt).
+      if (st.drawerOpen && !window.matchMedia(MD_QUERY).matches) {
         const live = e.key === "g" || gPending.current || e.key === "/" || e.key === "?";
         if (!live) return;
       }

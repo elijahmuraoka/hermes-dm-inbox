@@ -295,7 +295,13 @@ export function CommandPalette() {
         scope: "thread",
         keys: "e",
         icon: FileText,
-        run: withClose(() => addToChat()),
+        // R9 sweep (same ordering rule as Send/Reply): close FIRST, then the
+        // focus-bumping action — its rAF focus must land after the trap's
+        // restore, or the restore steals focus back from the composer.
+        run: () => {
+          close();
+          addToChat();
+        },
         // R4-3 (mirrors the store guard): only a STANDING draft can be
         // added — not a receipt (L2), not diverged composer work (R3), and
         // not a pending request whose versions are stale (R4). R8: nor
@@ -313,7 +319,14 @@ export function CommandPalette() {
         scope: "thread",
         keys: "c",
         icon: ArrowRight,
-        run: withClose(() => focusComposer()),
+        // R9 sweep: the direct `c` ends focused in the composer; the palette
+        // route raced — the tick's rAF focus could fire BEFORE the palette
+        // unmounted, and the trap's restore then stole focus back to the
+        // opener. Closing first puts the restore before the focus work.
+        run: () => {
+          close();
+          focusComposer();
+        },
         disabled: !selected,
       },
       {
@@ -323,7 +336,16 @@ export function CommandPalette() {
         scope: "thread",
         keys: "⌘⏎",
         icon: SendHorizontal,
-        run: withClose(() => sendMock()),
+        // R9: the direct ⌘Enter path BLURS after a send (blocker #1 — list
+        // scope, hotkeys live). The trap restores focus to the opener on
+        // unmount — often the very textarea the send just emptied — so land
+        // in list scope AFTER that restore: the trap's restore runs
+        // synchronously in the unmount commit; a rAF is guaranteed later.
+        run: () => {
+          sendMock();
+          close();
+          requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur?.());
+        },
         disabled: !selected || !composerText.trim(),
       },
       // Help

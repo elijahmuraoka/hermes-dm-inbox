@@ -5,6 +5,10 @@
     it the bottom sheet. Must match Tailwind's `xl:` usage in App/Thread. */
 export const XL_QUERY = "(min-width: 1280px)";
 
+/** The md breakpoint: below it the view/source rail lives in the drawer.
+    Must match the `md:hidden` on the drawer overlay and the hamburger (R9). */
+export const MD_QUERY = "(min-width: 768px)";
+
 /** Row exit animation length. The CSS class reads this via inline
     animationDuration (TS is the single source; the keyframe's own duration
     is only a fallback) and exitThenCommit delays the data flip by it. */

@@ -12,7 +12,7 @@ import { NoSelection } from "@/components/StatusStates";
 import { Kbd } from "@/components/ui/kbd";
 import { FocusTrap } from "@/components/ui/focus-trap";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
-import { XL_QUERY } from "@/lib/constants";
+import { MD_QUERY, XL_QUERY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -111,6 +111,10 @@ export default function App() {
 
       {/* Mobile drawer (<md): hamburger → the same view/source rail. */}
       {drawerOpen && <MobileDrawer onClose={() => setDrawer(false)} />}
+      {/* R9: the drawer only exists below md (md:hidden) — crossing the
+          breakpoint auto-closes it, or the stale open-state swallows keys
+          behind an invisible overlay and re-pops uninvited on re-narrow. */}
+      {drawerOpen && <DrawerAutoClose onClose={() => setDrawer(false)} />}
 
       {/* Below xl the hero loop lives in a bottom sheet — opened by `d`, the
           thread's Draft button, or any draft request. Never a silent mutation. */}
@@ -166,6 +170,23 @@ function HintBar() {
       </button>
     </div>
   );
+}
+
+/** R9: mounts only while the drawer is open; closes it the moment the md
+    breakpoint is crossed (or if it somehow opened at ≥md). The overlay is
+    md:hidden — open-state must not outlive the surface it opens, or it
+    swallows keys behind an invisible layer and re-pops on re-narrow. */
+function DrawerAutoClose({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const mq = window.matchMedia(MD_QUERY);
+    const sync = () => {
+      if (mq.matches) onClose();
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [onClose]);
+  return null;
 }
 
 /** aria-modal must mean it: focus moves in on open, Tab is trapped, focus
