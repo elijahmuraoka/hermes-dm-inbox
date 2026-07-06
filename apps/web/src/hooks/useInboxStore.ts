@@ -353,7 +353,12 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       drawerOpen: false,
       ...(same ? {} : { exitingIds: [] }),
     });
-    reanchor(set, get, same ? "keep" : "top");
+    // R17 (last of the no-op class): a same-view call cannot change the
+    // list, so it only ANCHORS when nothing is selected — running keep-mode
+    // unconditionally re-anchored an intentionally orphaned selection
+    // (post-send routing strip) to row 0 for a view no-op.
+    if (!same) reanchor(set, get, "top");
+    else if (!get().selectedId) reanchor(set, get, "keep");
   },
 
   // Every filter mutation re-anchors selection on the first visible row —
@@ -376,8 +381,13 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   toggleShowDone: () => {
     set((s) => ({ showDoneInSent: !s.showDoneInSent }));
-    // Hiding done can orphan the selection; re-anchor only if it vanished.
-    reanchor(set, get, "keep");
+    // Hiding done can orphan the selection — but only IN SENT (R17): the
+    // flag cannot change Important/All, and keep-mode still re-anchored an
+    // INTENTIONALLY orphaned selection (post-send strip, read-orphan) to
+    // row 0 — selection cost for a view no-op (R5 family). The palette
+    // keeps exposing the toggle globally as preference-setting (R13); the
+    // reanchor is Sent-scoped.
+    if (get().activeView === "sent") reanchor(set, get, "keep");
   },
 
   // Folding a section can orphan a selected row — same re-anchor rule as above.
