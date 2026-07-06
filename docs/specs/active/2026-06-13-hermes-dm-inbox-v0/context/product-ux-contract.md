@@ -167,7 +167,7 @@ Hermes/draft:
 | `Shift+D` | draft with custom instructions |
 | `t` | triage selected/thread |
 | `m` | summarize thread |
-| `e` | add picked draft to chat (contextual; otherwise mark done) |
+| `a` | add picked draft to chat (R20: dedicated key — `e` is mark-done everywhere; one key for two semantically distant actions on hidden draft state was a slip hazard; `e` stays a no-op while a draft is in flight or handed to the composer) |
 | `r` | refine: focus the studio chat input |
 | `x` | reject draft |
 
@@ -205,7 +205,7 @@ Human loop:
 1. Open Important (home).
 2. Move with `j/k` — the needs-reply queue already leads with leverage (drafts, urgency, oldest debt).
 3. Use Hermes suggested label/priority.
-4. Press `d` to generate draft or `e` to mark done.
+4. Press `d` to generate draft or `e` to mark done (`a` adds the picked draft to the chat).
 5. Press `s` to snooze if no action now (hidden until it returns; counted in the rail).
 6. Sweep the FYI section; `e` acknowledges each item once seen (it drains into All).
 7. Sweep Sent for "Needs follow-up" threads; `d` there drafts a nudge.
@@ -249,6 +249,10 @@ not_started
 
 Draft panel requirements (v4 — the drafting studio):
 
+- surface anchoring is responsive (R20, Elijah): persistent side panel at `xl+`;
+  below that an overlay with the SAME state/trap/key-matrix whose anchor follows
+  the breakpoint — right-anchored drawer `md`–`xl` (horizontal room; the bottom
+  sheet is a phone pattern), bottom sheet under `md`
 - read-only draft card + navigable version stepper (v1/v2/v3)
 - a lightweight chat with Hermes under the card; each Hermes reply = a new version
 - the chat is the instruction record (no Instructions/Model/policy meta rows)
