@@ -123,7 +123,7 @@ interface InboxState {
   iterateDraft: (instruction: string) => void; // studio chat turn → NEW version
   setActiveVersion: (id: string) => void; // stepper navigation (v1/v2/v3)
   focusStudio: () => void; // r: focus the studio chat input (intent required — no bare regen)
-  addToChat: () => void; // e: prefill the composer with the active draft version
+  addToChat: () => void; // a: prefill the composer with the active draft version (R20 split)
 
   // composer
   setComposerText: (text: string) => void;
@@ -903,7 +903,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     // generated/iterated, but the active version is about to be superseded —
     // adding now copies STALE text the refinement never reaches, and the
     // user can send pre-refinement words. The palette mirrors this guard;
-    // `e` no-oping through the window is M3-consistent.
+    // `a` no-oping through the window matches the M3 philosophy (R20 split).
     if (get().draftingIds.includes(conv.id)) return;
     set((s) => ({
       composerText: version.text,

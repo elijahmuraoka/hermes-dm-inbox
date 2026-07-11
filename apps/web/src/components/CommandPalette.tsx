@@ -266,6 +266,11 @@ export function CommandPalette() {
         run: withClose(() => markDone()),
         // R13 sweep: re-marking a done thread only churns state + writes a
         // second audit event claiming a transition that didn't happen.
+        // PINNED (R21): deliberately ENABLED during draft-active states —
+        // the M3 guard exists for single-keystroke SLIPS; the palette (and
+        // the hover/header Done buttons) are intentional two-step archive
+        // paths, and R15 defines the verdict's composer/handoff reconcile.
+        // Do not mirror the e-key no-op here.
         disabled: !selected || selected.status === "done",
       },
       {

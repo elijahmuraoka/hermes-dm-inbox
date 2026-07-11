@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { Conversation, ViewId } from "@/lib/types";
 import { SOURCE_META } from "@/lib/types";
 import { personFor } from "@/lib/mock-data";
@@ -56,8 +56,19 @@ function ConversationRowImpl({ conversation: c, view, selected, exiting, now }: 
   // (the main button keeps focus after a click) and hide its time for good.
   const fadeOnHover = "transition-opacity duration-[120ms] group-hover:opacity-0";
 
+  // R21: SELECTION FOLLOWS VISIBILITY — the list had no scroll management at
+  // all: j/k walked the selection below the fold, and a lens change that
+  // re-anchors to row 0 left the pane scrolled mid-list. block:"nearest"
+  // scrolls only when the row is actually off-screen (no jumpiness), instant
+  // by design — keyboard nav is not motion-causality territory.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) wrapRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
+
   return (
     <div
+      ref={wrapRef}
       // R19: marks the row (and its hover actions) as an app-managed
       // selection surface — j/k rove stale DOM focus off anything inside.
       data-conv-row=""

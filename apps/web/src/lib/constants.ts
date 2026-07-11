@@ -2,7 +2,8 @@
 // string/number literals with nothing keeping them in sync.
 
 /** The xl breakpoint: at/above it the draft studio is the side panel; below
-    it the bottom sheet. Must match Tailwind's `xl:` usage in App/Thread. */
+    it the OVERLAY (bottom sheet under md, right drawer md–xl — R20). Must
+    match Tailwind's `xl:` usage in App/Thread. */
 export const XL_QUERY = "(min-width: 1280px)";
 
 /** The md breakpoint: below it the view/source rail lives in the drawer.

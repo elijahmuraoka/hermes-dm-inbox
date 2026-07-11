@@ -338,8 +338,8 @@ A slice is done only when, on a **real running app with mock data**, rendered an
 3. Amber appears ONLY as Hermes presence (mark chip, studio, HERMES label) — never as a share signal.
 4. `⌘K` palette opens <100ms, categorized, keyboard-only usable; `?` shows shortcuts.
 5. `d` returns **three angles**; `1/2/3` picks one; the studio chat refines it (each instruction → a new
-   stepper version, visibly changed); `e` adds the active version to the composer; edit there; `⌘Enter`
-   sends (appears in-thread as a real send — no meta labels).
+   stepper version, visibly changed); `a` adds the active version to the composer (R20 split — `e`
+   archives); edit there; `⌘Enter` sends (appears in-thread as a real send — no meta labels).
 6. Light/dark toggle flips **every** surface with full parity; no unstyled/again-grey patches.
 7. Skeleton/empty/error states exist for the list and thread. No layout shift while drafting.
 8. axe: 0 serious/critical; visible focus on every control; no horizontal overflow at any width.

@@ -21,6 +21,10 @@ export function ViewNav() {
   const setShortcuts = useInboxStore((s) => s.setShortcuts);
   const filters = useInboxStore((s) => s.filters);
   const now = useInboxStore((s) => s.now);
+  // R21: an errored sync can't vouch for counts here either — the list
+  // header already shows "—"; the rail must not present stale numbers and
+  // unread dots as current (H2 family: the two surfaces may never disagree).
+  const errored = useInboxStore((s) => s.loadState) === "error";
 
   // THE population lens (review H2): the rail, the list title, and Sent's
   // done toggle all count through derive.population under the full active
@@ -81,24 +85,28 @@ export function ViewNav() {
                 style={{ background: VIEW_META[v].token }}
               />
               <span className="flex-1 truncate">{VIEW_META[v].label}</span>
-              {u > 0 && (
+              {!errored && u > 0 && (
                 <span
                   className="tnum size-1.5 rounded-full"
                   style={{ background: "var(--status-unread)" }}
                   title={`${u} unread`}
                 />
               )}
-              <TickNum
-                value={n}
-                className="tnum text-[0.6875rem] tabular-nums text-muted-foreground"
-              />
+              {errored ? (
+                <span className="tnum text-[0.6875rem] tabular-nums text-muted-foreground">—</span>
+              ) : (
+                <TickNum
+                  value={n}
+                  className="tnum text-[0.6875rem] tabular-nums text-muted-foreground"
+                />
+              )}
             </button>
           );
         })}
         {/* Snoozed is NOT a view (v5) — just an honest count while threads are
             hidden from the working views. They still appear in All. Solid
             muted-foreground: /80 opacity fails light-mode AA at this size. */}
-        {snoozedCount > 0 && (
+        {!errored && snoozedCount > 0 && (
           <p className="flex h-6 items-center gap-2 px-2 text-[0.6875rem] text-muted-foreground">
             <Moon className="size-3" strokeWidth={2} aria-hidden />
             <span className="flex-1">Snoozed</span>

@@ -99,8 +99,9 @@ export default function App() {
           </div>
 
           {/* Draft panel — persistent side rail at xl+ (rail+list+thread+panel
-              needs the room); below xl it's the bottom sheet. Exactly ONE of
-              the two surfaces is mounted at a time (useIsXl). */}
+              needs the room); below xl it's the overlay (sheet <md, right
+              drawer md–xl — R20). Exactly ONE of the two surfaces is mounted
+              at a time (useIsXl). */}
           {selected && isXl && (
             <div className="flex">
               <HermesDraftPanel conversation={selected} />

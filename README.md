@@ -20,7 +20,7 @@ The first review branch contains the product/architecture spec.
 | `j` / `k` | Next / previous conversation |
 | `Enter` | Open thread, then focus composer (defers to a focused control) |
 | `g i` / `g s` / `g a` | Go to Important / Sent / All |
-| `e` | Mark done (acknowledge on FYI; no-op while a draft is in flight) |
+| `e` | Mark done (acknowledge on FYI; no-op while a draft is in flight or in the composer) |
 | `a` | Add the picked draft to the chat composer |
 | `s` | Snooze |
 | `p` | Cycle priority |

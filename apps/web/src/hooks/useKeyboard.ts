@@ -84,6 +84,14 @@ export function useKeyboard() {
       // Native activation (Enter/Space on the focused control) still works:
       // swallowing skips the app handler without preventDefault.
       if (st.draftSheetOpen && !window.matchMedia(XL_QUERY).matches) {
+        // R21: a chord armed BEFORE the surface opened must not hijack the
+        // first key inside it (`g` is swallowed here, so a pending chord can
+        // only be pre-armed; `a` is both a chord terminal and a live key).
+        // Consume it as a failed chord — the L3 rule.
+        if (gPending.current) {
+          clearG();
+          return;
+        }
         const ds = st.selected()?.draft.status;
         const live =
           e.key === "1" || e.key === "2" || e.key === "3" || // angle pick

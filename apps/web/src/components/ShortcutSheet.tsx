@@ -25,7 +25,7 @@ const SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Triage",
     rows: [
-      ["e", "Mark done — acknowledges an FYI (no-op while a draft is in flight)"],
+      ["e", "Mark done — acknowledges an FYI (no-op while a draft is in flight or in the composer)"],
       ["s", "Snooze (hidden until it returns)"],
       ["p", "Toggle priority"],
     ],

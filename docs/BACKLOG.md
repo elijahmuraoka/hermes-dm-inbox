@@ -76,10 +76,11 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
   move is now visible within one list. Residual nit: the re-sort jump itself has no transition cue.
 - **N7 — Ultra-wide app frame.** Message measure is capped (68ch / 720px column), but the app shell
   itself stretches edge-to-edge at 2560+. Consider a max-width frame or a third meta column.
-- **Nit — `r` keybinding conflict with the keyboard contract.** The ux-contract assigns `r` to
-  sync/refresh globally and regenerate when draft-focused; the slice binds `r` only to regenerate.
-  The phantom "Sync all sources" palette command was deleted (honesty guardrail). When real mock
-  sync lands, implement it and resolve the `r` scoping (contextual binding or a new key).
+- **Nit — `r` keybinding conflict — RESOLVED in the contract** (R21 audit): the ux-contract now
+  assigns `r` = "refine: focus the studio chat input", exactly matching the slice's binding; no
+  sync/refresh `r` exists anywhere in the spec. Still open (separate): when real sync lands it
+  needs its own affordance — the phantom "Sync all sources" palette command stays deleted
+  (honesty guardrail) until then.
 - **Nit — no keyboard path to archive a drafted thread — RESOLVED by R20's e/a split** (see the
   M3-residual entry above): `e` now archives standing-card threads directly; in-flight/handoff
   states keep the slip guard. No `shift+E` needed.
@@ -108,6 +109,7 @@ sync removed). The following were accepted as Phase 1 work so they aren't lost:
 
 ## Phase 0 leftovers (pre-review)
 
-- Draft panel below `lg` is a bottom sheet (shipped); evaluate whether a persistent mini-bar beats
-  the sheet once real usage data exists.
+- Draft surface below `xl` is an overlay (R20: bottom sheet under `md`, right-anchored drawer
+  `md`–`xl`; shipped); evaluate whether a persistent mini-bar beats the overlay once real usage
+  data exists.
 - Search (`/`) currently opens the palette; real search is unbuilt.
