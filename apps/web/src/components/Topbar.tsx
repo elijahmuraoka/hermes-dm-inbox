@@ -1,0 +1,67 @@
+import { useInboxStore } from "@/hooks/useInboxStore";
+import { Kbd } from "@/components/ui/kbd";
+import { Menu, Search } from "lucide-react";
+
+export function Topbar() {
+  const setPalette = useInboxStore((s) => s.setPalette);
+  const setDrawer = useInboxStore((s) => s.setDrawer);
+  const loadState = useInboxStore((s) => s.loadState);
+  const synced = loadState === "ready";
+  const errored = loadState === "error";
+
+  return (
+    <header className="flex h-11 min-w-0 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-3 backdrop-blur">
+      {/* Mobile (<md): hamburger opens the view/source drawer. */}
+      <button
+        type="button"
+        onClick={() => setDrawer(true)}
+        aria-label="Open views and sources"
+        className="-ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+      >
+        <Menu className="size-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setPalette(true)}
+        className="group flex h-7 min-w-0 max-w-[21.25rem] flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 text-left text-[0.75rem] text-muted-foreground transition-colors hover:border-primary/25 hover:bg-muted/60"
+      >
+        <Search className="size-3.5 shrink-0" />
+        <span className="flex-1 truncate">Search people, messages, tasks…</span>
+        <Kbd className="hidden sm:inline-flex">/</Kbd>
+      </button>
+
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        <span
+          className="flex items-center gap-1.5 text-[0.71875rem] text-muted-foreground"
+          title={errored ? "iMessage didn’t respond — retry from the list" : undefined}
+        >
+          {/* In-flight is neutral slate, not amber — amber = Hermes presence
+              only. R4-4: an errored sync says so — "Syncing…" next to the
+              error state was a lie. */}
+          <span
+            className="size-1.5 rounded-full"
+            style={{
+              background: errored
+                ? "var(--destructive)"
+                : synced
+                  ? "var(--status-ok)"
+                  : "var(--view-all)",
+              boxShadow: `0 0 6px ${errored ? "var(--destructive)" : synced ? "var(--status-ok)" : "var(--view-all)"}`,
+            }}
+          />
+          {errored ? "Sync failed" : synced ? "Synced" : "Syncing…"}
+        </span>
+        {/* One clean keycap — not two command symbols side by side. */}
+        <button
+          type="button"
+          onClick={() => setPalette(true)}
+          aria-label="Open command palette"
+          className="flex items-center rounded-md p-0.5 transition-colors hover:bg-accent"
+        >
+          <Kbd className="h-6 px-2 text-[0.6875rem]">⌘K</Kbd>
+        </button>
+      </div>
+    </header>
+  );
+}
