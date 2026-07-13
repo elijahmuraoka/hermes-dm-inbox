@@ -2,8 +2,10 @@ import { CheckCircle2, Inbox, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ViewId } from "@/lib/types";
 
-/** Row skeleton — matches the locked ledger row (h-10 single-line) so there is no shift. */
-export function RowSkeleton() {
+/** Row skeleton — matches the locked ledger row (h-10 single-line) so there is
+    no shift. Module-private: only ListSkeleton below uses it (react-doctor
+    unused-export). */
+function RowSkeleton() {
   return (
     <div className="flex h-10 w-full items-center gap-2.5 border-b border-border/60 pl-3 pr-4">
       <span className="w-2 shrink-0" />

@@ -50,17 +50,26 @@ export function ShortcutSheet() {
   if (!open) return null;
 
   return (
+    // Backdrop: click OR Escape dismisses. The dialog semantics live on the
+    // panel (FocusTrap) below — the backdrop is just the dismiss affordance,
+    // made keyboard-legible for react-doctor a11y; real Esc is global.
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
       onClick={() => setShortcuts(false)}
-      role="dialog"
-      aria-label="Keyboard shortcuts"
-      aria-modal="true"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setShortcuts(false);
+      }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close keyboard shortcuts"
     >
       {/* M5: aria-modal means it — trap focus; tabIndex -1 lets the panel
           itself take focus (this sheet has no focusable children). */}
       <FocusTrap
         tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts"
         className="animate-scale-in w-full max-w-[35rem] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
@@ -78,8 +87,8 @@ export function ShortcutSheet() {
                 <div key={k} className="flex items-center justify-between gap-3 py-0.5">
                   <span className="text-[0.75rem] text-muted-foreground">{label}</span>
                   <span className="flex shrink-0 gap-1">
-                    {k.split(" ").map((part, i) => (
-                      <Kbd key={i}>{part}</Kbd>
+                    {k.split(" ").map((part) => (
+                      <Kbd key={`${k}:${part}`}>{part}</Kbd>
                     ))}
                   </span>
                 </div>

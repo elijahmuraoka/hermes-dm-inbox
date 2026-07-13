@@ -35,6 +35,16 @@ interface RowProps {
 // The cluster is tabIndex -1 — the keyboard path is e/d/s, not forty tab
 // stops. v7 motion: `exiting` plays the leave animation while the mutation
 // waits (store exitThenCommit); the collapsing height closes the gap.
+
+// Static dispatch (getState) keeps the memo intact — no extra subscriptions.
+// Module scope: it closes over nothing per-row, so it need not be rebuilt
+// every render (react-doctor prefer-module-scope-pure-function).
+const act =
+  (fn: (s: ReturnType<typeof useInboxStore.getState>) => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn(useInboxStore.getState());
+  };
+
 function ConversationRowImpl({ conversation: c, view, selected, exiting, now }: RowProps) {
   const person = personFor(c.personId);
   const lastMsg = c.messages[c.messages.length - 1];
@@ -42,13 +52,6 @@ function ConversationRowImpl({ conversation: c, view, selected, exiting, now }: 
   const stale = view === "sent" && isStale(c, now);
   const fyi = c.status === "fyi";
   const quietDays = daysSince(c.lastActivity, now);
-
-  // Static dispatch (getState) keeps the memo intact — no extra subscriptions.
-  const act = (fn: (s: ReturnType<typeof useInboxStore.getState>) => void) =>
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      fn(useInboxStore.getState());
-    };
 
   // The fading right cluster: while hovered, time + affordance chips hand
   // their slot to the buttons — the chip's message IS the button now shown.
