@@ -133,8 +133,17 @@ export default function App() {
         <div
           className="fixed inset-0 z-40 flex flex-col justify-end bg-black/45 backdrop-blur-sm md:flex-row"
           onClick={() => setDraftSheet(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setDraftSheet(false);
+          }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close draft"
         >
-          {/* R2: the fourth aria-modal gets the same trap as the other three. */}
+          {/* R2: the fourth aria-modal gets the same trap as the other three.
+              The backdrop above is just the dismiss affordance (react-doctor
+              a11y); the dialog semantics live on the FocusTrap; real Esc is
+              global. */}
           <FocusTrap
             role="dialog"
             aria-modal="true"
@@ -212,9 +221,17 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
   useFocusTrap(panelRef);
 
   return (
+    // Backdrop: click OR Escape dismisses (react-doctor a11y); the dialog
+    // semantics live on the inner panel; real Esc is handled globally.
     <div
       className="fixed inset-0 z-40 flex bg-black/45 backdrop-blur-sm md:hidden"
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      role="button"
+      tabIndex={-1}
+      aria-label="Close views and sources"
     >
       <div
         ref={panelRef}
