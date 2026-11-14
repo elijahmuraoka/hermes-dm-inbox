@@ -19,6 +19,10 @@ Read this before assuming anything works.
 
 If you are evaluating whether this can read your actual DMs today: it cannot.
 
+## Design history
+
+[Retired unified inbox prototype](docs/history/unified-inbox-prototype.md) records the earlier backend design, useful ideas and known gaps.
+
 ## Quickstart
 
 You need [Bun](https://bun.sh) 1.3 or newer.
